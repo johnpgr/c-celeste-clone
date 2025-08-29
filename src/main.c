@@ -9,7 +9,7 @@ int main(int argc, [[maybe_unused]] char* argv[argc+1]) {
 
     for (usize x = 0; x < game.display_width; x++) {
         for (usize y = 0; y < game.display_height; y++) {
-            game_display_pixel(&game, x, y, 0xff000080);
+            game_display_pixel(&game, x, y, 0xff000000);
         }
     }
 
