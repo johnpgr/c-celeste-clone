@@ -1,0 +1,14 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "compile & run",
+            "type": "shell",
+            "command": "clang -std=c23 -Wall -Wextra -Werror -framework Cocoa ./src/main.c ./src/game.c ./src/window.m -o ./out/game && ./out/game",
+            "group": {
+                "kind": "none",
+                "isDefault": true
+            }
+        }
+    ]
+}
