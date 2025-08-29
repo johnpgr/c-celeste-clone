@@ -5,7 +5,7 @@ typedef struct {
     char* title;
     usize fps;
 
-    u32* display;               /* RGBA32 FORMAT */
+    u32* display;
     usize display_width;
     usize display_height;
 

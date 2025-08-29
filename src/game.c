@@ -1,8 +1,10 @@
 #include "def.h"
 #include "game.h"
 #include <stdio.h>
+#define OLIVEC_IMPLEMENTATION
+#include "olive.c"
 
-constexpr char TITLE[]          = "Software rendering in C";
+constexpr char TITLE[]          = "The game";
 constexpr int FPS               = 60;
 constexpr int WIDTH             = 800;
 constexpr int HEIGHT            = 600;
@@ -12,10 +14,30 @@ constexpr int AUDIO_CAPACITY    = (AUDIO_SAMPLE_RATE/FPS * AUDIO_CHANNELS);
 
 static_assert(AUDIO_SAMPLE_RATE % FPS == 0);
 
-static u32 global_display[WIDTH * HEIGHT] = {0};
-static i16 global_audio[AUDIO_CAPACITY]   = {0};
+static u32 global_display[WIDTH * HEIGHT];
+static i16 global_audio[AUDIO_CAPACITY];
 
 Game game_init(void) {
+    Olivec_Canvas oc = {
+        .pixels = global_display,
+        .width  = WIDTH,
+        .height = HEIGHT,
+        .stride = WIDTH,
+    };
+
+    int cx = WIDTH / 2;
+    int cy = HEIGHT / 2;
+
+    olivec_triangle3c(
+        oc,
+        cx - cx/2, cy + cy/2,
+        cx + cx/2, cy + cy/2,
+        cx, cy - cy/2,
+        0xFFFF0000,
+        0xFF00FF00,
+        0xFF0000FF
+    );
+
     return (Game){
         .title             = (char*)TITLE,
         .fps               = FPS,
@@ -29,11 +51,13 @@ Game game_init(void) {
 };
 
 void game_update(void) {};
-void game_key_up(int key) {
-    (void)key;
+
+void game_key_up([[maybe_unused]] int key) {
+    TODO("Implement this");
 };
-void game_key_down(int key) {
-    (void)key;
+
+void game_key_down([[maybe_unused]] int key) {
+    TODO("Implement this");
 };
 
 void game_display_pixel(Game* game, u32 x, u32 y, u32 value) {
