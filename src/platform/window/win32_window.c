@@ -5,8 +5,13 @@
 
 static struct {
     HWND h_wnd;
-    HBITMAP h_bitmap;
     HDC hdc;
+    HDC mem_dc;
+    void* dib_pixels;
+    HBITMAP dib_bitmap;
+    HBITMAP old_bitmap;
+    int cached_client_width;
+    int cached_client_height;
     Game* game;
     bool should_close;
     bool is_resizable;
@@ -100,13 +105,36 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             g_input_state.mouse_y = GET_Y_LPARAM(lParam);
             break;
         case WM_SIZE:
-            // This is handled by window_set_size directly, but for completeness
-            // if we wanted to auto-resize the framebuffer we'd handle it here.
+            g_window_state.cached_client_width = LOWORD(lParam);
+            g_window_state.cached_client_height = HIWORD(lParam);
             break;
         default:
             return DefWindowProc(hWnd, uMsg, wParam, lParam);
     }
     return 0;
+}
+
+static HBITMAP create_dib_section(HDC hdc, int width, int height, void** pixel_data) {
+    BITMAPINFO bmi = {};
+    bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    bmi.bmiHeader.biWidth = width;
+    bmi.bmiHeader.biHeight = -height;
+    bmi.bmiHeader.biPlanes = 1;
+    bmi.bmiHeader.biBitCount = 32;
+    bmi.bmiHeader.biCompression = BI_RGB;
+
+    return CreateDIBSection(hdc, &bmi, DIB_RGB_COLORS, pixel_data, NULL, 0);
+}
+
+static void setup_double_buffering() {
+    g_window_state.mem_dc = CreateCompatibleDC(g_window_state.hdc);
+    g_window_state.dib_bitmap = create_dib_section(
+        g_window_state.hdc,
+        g_window_state.game->display_width,
+        g_window_state.game->display_height,
+        &g_window_state.dib_pixels
+    );
+    g_window_state.old_bitmap = SelectObject(g_window_state.mem_dc, g_window_state.dib_bitmap);
 }
 
 /**
@@ -156,24 +184,34 @@ void window_init(Game* game) {
         return;
     }
 
-    // Set up the bitmap info for rendering
-    g_custom_bitmap_info.header.biSize = sizeof(BITMAPINFOHEADER);
-    g_custom_bitmap_info.header.biWidth = g_window_state.game->display_width;
-    g_custom_bitmap_info.header.biHeight = -g_window_state.game->display_height; // Negative for top-down DIB
-    g_custom_bitmap_info.header.biPlanes = 1;
-    g_custom_bitmap_info.header.biBitCount = 32;
-    g_custom_bitmap_info.header.biCompression = BI_BITFIELDS;
-    g_custom_bitmap_info.masks[0] = 0x000000FF; // Red mask   (bits 7-0)
-    g_custom_bitmap_info.masks[1] = 0x0000FF00; // Green mask (bits 15-8)  
-    g_custom_bitmap_info.masks[2] = 0x00FF0000; // Blue mask  (bits 23-16)
-    g_custom_bitmap_info.masks[3] = 0xFF000000; // Alpha mask (bits 31-24)
+    SetStretchBltMode(g_window_state.hdc, HALFTONE); // Better quality scaling
+    setup_double_buffering();
 
     // Get a device context for the window
     g_window_state.hdc = GetDC(g_window_state.h_wnd);
 
-    // Show the window
+    // Show window
     ShowWindow(g_window_state.h_wnd, SW_SHOWDEFAULT);
     UpdateWindow(g_window_state.h_wnd);
+}
+
+/**
+ * @brief Present the framebuffer to the screen
+ */
+void window_present(void) {
+    if (!g_window_state.h_wnd || !g_window_state.game || !g_window_state.game->display) return;
+
+    memcpy(g_window_state.dib_pixels, g_window_state.game->display, 
+           g_window_state.game->display_width * g_window_state.game->display_height * 4);
+
+    StretchBlt(g_window_state.hdc, 
+               0, 0, 
+               g_window_state.cached_client_width, g_window_state.cached_client_height,
+               g_window_state.mem_dc, 
+               0, 0, 
+               g_window_state.game->display_width, 
+               g_window_state.game->display_height,
+               SRCCOPY);
 }
 
 /**
@@ -184,9 +222,9 @@ void window_cleanup(void) {
         ReleaseDC(g_window_state.h_wnd, g_window_state.hdc);
         g_window_state.hdc = NULL;
     }
-    if (g_window_state.h_bitmap) {
-        DeleteObject(g_window_state.h_bitmap);
-        g_window_state.h_bitmap = NULL;
+    if (g_window_state.dib_bitmap) {
+        DeleteObject(g_window_state.dib_bitmap);
+        g_window_state.dib_bitmap = NULL;
     }
     if (g_window_state.h_wnd) {
         DestroyWindow(g_window_state.h_wnd);
@@ -294,24 +332,3 @@ void window_set_resizable(bool resizable) {
     SetWindowLong(g_window_state.h_wnd, GWL_STYLE, dwStyle);
 }
 
-/**
- * @brief Present the framebuffer to the screen
- */
-void window_present(void) {
-    if (!g_window_state.h_wnd || !g_window_state.game || !g_window_state.game->display) return;
-    
-    RECT client_rect;
-    GetClientRect(g_window_state.h_wnd, &client_rect);
-
-    StretchDIBits(
-        g_window_state.hdc,
-        0, 0,
-        client_rect.right, client_rect.bottom,
-        0, 0,
-        g_window_state.game->display_width, g_window_state.game->display_height,
-        g_window_state.game->display,
-        (const BITMAPINFO*)&g_custom_bitmap_info,
-        DIB_RGB_COLORS,
-        SRCCOPY
-    );
-}
