@@ -123,7 +123,7 @@ static HBITMAP create_dib_section(HDC hdc, int width, int height, void** pixel_d
     bmi.bmiHeader.biBitCount = 32;
     bmi.bmiHeader.biCompression = BI_RGB;
 
-    return CreateDIBSection(hdc, &bmi, DIB_RGB_COLORS, pixel_data, NULL, 0);
+    return CreateDIBSection(hdc, &bmi, DIB_RGB_COLORS, pixel_data, nullptr, 0);
 }
 
 static void setup_double_buffering() {
@@ -144,19 +144,19 @@ void window_init(Game* game) {
     g_window_state.game = game;
 
     // Get the current instance handle
-    HINSTANCE hInstance = GetModuleHandle(NULL);
+    HINSTANCE hInstance = GetModuleHandle(nullptr);
 
     // Define the window class
     WNDCLASS wc = {};
     wc.lpfnWndProc = WindowProc;
     wc.hInstance = hInstance;
     wc.lpszClassName = "GameWindowClass";
-    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+    wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
 
     // Register the window class
     if (!RegisterClass(&wc)) {
-        fprintf(stderr, "Error: Failed to register window class\n");
+        LOG("Error: Failed to register window class\n");
         return;
     }
 
@@ -173,14 +173,14 @@ void window_init(Game* game) {
         CW_USEDEFAULT, CW_USEDEFAULT,
         rect.right - rect.left,
         rect.bottom - rect.top,
-        NULL,
-        NULL,
+        nullptr,
+        nullptr,
         hInstance,
-        NULL
+        nullptr
     );
 
     if (!g_window_state.h_wnd) {
-        fprintf(stderr, "Error: Failed to create window\n");
+        LOG("Error: Failed to create window\n");
         return;
     }
 
@@ -220,15 +220,15 @@ void window_present(void) {
 void window_cleanup(void) {
     if (g_window_state.hdc) {
         ReleaseDC(g_window_state.h_wnd, g_window_state.hdc);
-        g_window_state.hdc = NULL;
+        g_window_state.hdc = nullptr;
     }
     if (g_window_state.dib_bitmap) {
         DeleteObject(g_window_state.dib_bitmap);
-        g_window_state.dib_bitmap = NULL;
+        g_window_state.dib_bitmap = nullptr;
     }
     if (g_window_state.h_wnd) {
         DestroyWindow(g_window_state.h_wnd);
-        g_window_state.h_wnd = NULL;
+        g_window_state.h_wnd = nullptr;
     }
 }
 
@@ -244,7 +244,7 @@ bool window_should_close(void) {
  */
 void window_poll_events(void) {
     MSG msg;
-    while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
+    while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
@@ -313,7 +313,7 @@ void window_set_size(int width, int height) {
     DWORD dwStyle = GetWindowLong(g_window_state.h_wnd, GWL_STYLE);
     AdjustWindowRect(&rect, dwStyle, FALSE);
 
-    SetWindowPos(g_window_state.h_wnd, NULL, 0, 0, rect.right - rect.left, rect.bottom - rect.top, SWP_NOMOVE | SWP_NOZORDER);
+    SetWindowPos(g_window_state.h_wnd, nullptr, 0, 0, rect.right - rect.left, rect.bottom - rect.top, SWP_NOMOVE | SWP_NOZORDER);
 }
 
 /**

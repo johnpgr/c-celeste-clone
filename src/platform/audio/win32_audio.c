@@ -116,9 +116,9 @@ void audio_init(Game* game) {
     global_audio_state.running = true;
 
     // Create DirectSound object
-    HRESULT hr = DirectSoundCreate8(NULL, &global_audio_state.dsound, NULL);
+    HRESULT hr = DirectSoundCreate8(nullptr, &global_audio_state.dsound, nullptr);
     if (FAILED(hr)) {
-        fprintf(stderr, "Error: Could not create DirectSound object (HRESULT: 0x%08lX)\n", hr);
+        LOG("Error: Could not create DirectSound object (HRESULT: 0x%08lX)\n", hr);
         return;
     }
 
@@ -127,7 +127,7 @@ void audio_init(Game* game) {
     HWND hwnd = GetDesktopWindow();
     hr = IDirectSound8_SetCooperativeLevel(global_audio_state.dsound, hwnd, DSSCL_PRIORITY);
     if (FAILED(hr)) {
-        fprintf(stderr, "Error: Could not set DirectSound cooperative level (HRESULT: 0x%08lX)\n", hr);
+        LOG("Error: Could not set DirectSound cooperative level (HRESULT: 0x%08lX)\n", hr);
         IDirectSound8_Release(global_audio_state.dsound);
         return;
     }
@@ -139,9 +139,9 @@ void audio_init(Game* game) {
     primary_desc.dwFlags = DSBCAPS_PRIMARYBUFFER;
 
     hr = IDirectSound8_CreateSoundBuffer(global_audio_state.dsound, &primary_desc, 
-                                        &global_audio_state.primary_buffer, NULL);
+                                        &global_audio_state.primary_buffer, nullptr);
     if (FAILED(hr)) {
-        fprintf(stderr, "Error: Could not create primary sound buffer (HRESULT: 0x%08lX)\n", hr);
+        LOG("Error: Could not create primary sound buffer (HRESULT: 0x%08lX)\n", hr);
         IDirectSound8_Release(global_audio_state.dsound);
         return;
     }
@@ -158,7 +158,7 @@ void audio_init(Game* game) {
 
     hr = IDirectSoundBuffer_SetFormat(global_audio_state.primary_buffer, &wave_format);
     if (FAILED(hr)) {
-        fprintf(stderr, "Error: Could not set primary buffer format (HRESULT: 0x%08lX)\n", hr);
+        LOG("Error: Could not set primary buffer format (HRESULT: 0x%08lX)\n", hr);
     }
 
     // Create secondary buffer (the one we actually write to)
@@ -172,9 +172,9 @@ void audio_init(Game* game) {
     secondary_desc.lpwfxFormat = &wave_format;
 
     hr = IDirectSound8_CreateSoundBuffer(global_audio_state.dsound, &secondary_desc,
-                                        &global_audio_state.secondary_buffer, NULL);
+                                        &global_audio_state.secondary_buffer, nullptr);
     if (FAILED(hr)) {
-        fprintf(stderr, "Error: Could not create secondary sound buffer (HRESULT: 0x%08lX)\n", hr);
+        LOG("Error: Could not create secondary sound buffer (HRESULT: 0x%08lX)\n", hr);
         IDirectSoundBuffer_Release(global_audio_state.primary_buffer);
         IDirectSound8_Release(global_audio_state.dsound);
         return;
@@ -195,9 +195,9 @@ void audio_init(Game* game) {
     }
 
     // Create stop event for thread synchronization
-    global_audio_state.stop_event = CreateEvent(NULL, TRUE, FALSE, NULL);
+    global_audio_state.stop_event = CreateEvent(nullptr, TRUE, FALSE, nullptr);
     if (!global_audio_state.stop_event) {
-        fprintf(stderr, "Error: Could not create audio stop event\n");
+        LOG("Error: Could not create audio stop event\n");
         IDirectSoundBuffer_Release(global_audio_state.secondary_buffer);
         IDirectSoundBuffer_Release(global_audio_state.primary_buffer);
         IDirectSound8_Release(global_audio_state.dsound);
@@ -207,13 +207,13 @@ void audio_init(Game* game) {
     // Start playing the buffer (looping)
     hr = IDirectSoundBuffer_Play(global_audio_state.secondary_buffer, 0, 0, DSBPLAY_LOOPING);
     if (FAILED(hr)) {
-        fprintf(stderr, "Error: Could not start playing sound buffer (HRESULT: 0x%08lX)\n", hr);
+        LOG("Error: Could not start playing sound buffer (HRESULT: 0x%08lX)\n", hr);
     }
 
     // Create and start the audio thread
-    global_audio_state.audio_thread = CreateThread(NULL, 0, audio_thread_proc, game, 0, NULL);
+    global_audio_state.audio_thread = CreateThread(nullptr, 0, audio_thread_proc, game, 0, nullptr);
     if (!global_audio_state.audio_thread) {
-        fprintf(stderr, "Error: Could not create audio thread\n");
+        LOG("Error: Could not create audio thread\n");
         CloseHandle(global_audio_state.stop_event);
         IDirectSoundBuffer_Release(global_audio_state.secondary_buffer);
         IDirectSoundBuffer_Release(global_audio_state.primary_buffer);
@@ -235,13 +235,13 @@ void audio_cleanup(void) {
         if (global_audio_state.audio_thread) {
             WaitForSingleObject(global_audio_state.audio_thread, 5000); // 5 second timeout
             CloseHandle(global_audio_state.audio_thread);
-            global_audio_state.audio_thread = NULL;
+            global_audio_state.audio_thread = nullptr;
         }
         
         // Close event handle
         if (global_audio_state.stop_event) {
             CloseHandle(global_audio_state.stop_event);
-            global_audio_state.stop_event = NULL;
+            global_audio_state.stop_event = nullptr;
         }
     }
 
@@ -249,17 +249,17 @@ void audio_cleanup(void) {
     if (global_audio_state.secondary_buffer) {
         IDirectSoundBuffer_Stop(global_audio_state.secondary_buffer);
         IDirectSoundBuffer_Release(global_audio_state.secondary_buffer);
-        global_audio_state.secondary_buffer = NULL;
+        global_audio_state.secondary_buffer = nullptr;
     }
 
     if (global_audio_state.primary_buffer) {
         IDirectSoundBuffer_Release(global_audio_state.primary_buffer);
-        global_audio_state.primary_buffer = NULL;
+        global_audio_state.primary_buffer = nullptr;
     }
 
     if (global_audio_state.dsound) {
         IDirectSound8_Release(global_audio_state.dsound);
-        global_audio_state.dsound = NULL;
+        global_audio_state.dsound = nullptr;
     }
 }
 

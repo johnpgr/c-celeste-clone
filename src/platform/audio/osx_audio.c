@@ -20,7 +20,7 @@ static void audio_callback(void* user_data, AudioQueueRef aq, AudioQueueBufferRe
     if(!game) {
         memset(buffer->mAudioData, 0, buffer->mAudioDataBytesCapacity);
         buffer->mAudioDataByteSize = buffer->mAudioDataBytesCapacity;
-        AudioQueueEnqueueBuffer(aq, buffer, 0, NULL);
+        AudioQueueEnqueueBuffer(aq, buffer, 0, nullptr);
         return;
     }
 
@@ -55,7 +55,7 @@ static void audio_callback(void* user_data, AudioQueueRef aq, AudioQueueBufferRe
     }
 
     buffer->mAudioDataByteSize = buffer_size;
-    AudioQueueEnqueueBuffer(aq, buffer, 0, NULL);
+    AudioQueueEnqueueBuffer(aq, buffer, 0, nullptr);
 }
 
 void audio_init(Game* game) {
@@ -73,9 +73,9 @@ void audio_init(Game* game) {
         .mBytesPerFrame    = game->audio_channels * sizeof(i16),
     };
 
-    OSStatus status = AudioQueueNewOutput(&format, audio_callback, game, NULL, NULL, 0, &global_audio_state.queue);
+    OSStatus status = AudioQueueNewOutput(&format, audio_callback, game, nullptr, nullptr, 0, &global_audio_state.queue);
     if(status != noErr) {
-        fprintf(stderr, "Error: Could not create audio queue\n");
+        LOG("Error: Could not create audio queue\n");
         return;
     }
 
@@ -86,15 +86,15 @@ void audio_init(Game* game) {
             // Initialize buffers with silence
             memset(global_audio_state.buffers[i]->mAudioData, 0, buffer_size);
             global_audio_state.buffers[i]->mAudioDataByteSize = buffer_size;
-            AudioQueueEnqueueBuffer(global_audio_state.queue, global_audio_state.buffers[i], 0, NULL);
+            AudioQueueEnqueueBuffer(global_audio_state.queue, global_audio_state.buffers[i], 0, nullptr);
         } else {
-            fprintf(stderr, "Error: Could not allocate audio buffer %d (status: %d)\n", i, (int)status);
+            LOG("Error: Could not allocate audio buffer %d (status: %d)\n", i, (int)status);
         }
     }
 
-    status = AudioQueueStart(global_audio_state.queue, NULL);
+    status = AudioQueueStart(global_audio_state.queue, nullptr);
     if (status != noErr) {
-        fprintf(stderr, "Error: Could not start audio queue (status: %d)\n", (int)status);
+        LOG("Error: Could not start audio queue (status: %d)\n", (int)status);
     }
 }
 
@@ -102,6 +102,6 @@ void audio_cleanup(void) {
     if (global_audio_state.queue) {
         AudioQueueStop(global_audio_state.queue, true);
         AudioQueueDispose(global_audio_state.queue, true);
-        global_audio_state.queue = NULL;
+        global_audio_state.queue = nullptr;
     }
 }

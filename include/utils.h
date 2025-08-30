@@ -39,6 +39,6 @@ static inline void sleep_nanos(u64 nanos) {
     struct timespec ts;
     ts.tv_sec = nanos / 1000000000;
     ts.tv_nsec = nanos % 1000000000;
-    nanosleep(&ts, NULL);
+    nanosleep(&ts, nullptr);
 #endif
 }

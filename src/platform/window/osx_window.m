@@ -73,8 +73,8 @@ typedef struct {
                 kCGImageAlphaPremultipliedFirst | kCGImageByteOrder32Little
             );
         } else {
-            color_space = NULL;
-            bitmap_context = NULL;
+            color_space = nullptr;
+            bitmap_context = nullptr;
             bitmap_width = bitmap_height = bytes_per_row = 0;
         }
     }
@@ -86,11 +86,11 @@ typedef struct {
 
     if (bitmap_context) {
         CGContextRelease(bitmap_context);
-        bitmap_context = NULL;
+        bitmap_context = nullptr;
     }
     if (color_space) {
         CGColorSpaceRelease(color_space);
-        color_space = NULL;
+        color_space = nullptr;
     }
 }
 

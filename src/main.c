@@ -40,7 +40,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
             if(current_time - fps_timer_start >= NANOS_PER_SEC) {
                 double fps = (double)frame_count * NANOS_PER_SEC /
                     (current_time - fps_timer_start);
-                printf("FPS: %.2f\n", fps);
+                LOG("FPS: %.2f\n", fps);
                 frame_count = 0;
                 fps_timer_start = current_time;
             }
@@ -54,6 +54,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
 
 #ifdef _WIN32
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
-    return main(0, NULL);
+    return main(0, nullptr);
 }
 #endif
