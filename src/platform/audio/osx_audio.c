@@ -36,7 +36,7 @@ static void audio_callback(void* user_data, AudioQueueRef aq, AudioQueueBufferRe
 
     // Generate audio directly in the callback
     const double tone_hz = 440.0;
-    const double phase_increment = 2.0 * M_PI * tone_hz / game->audio_sample_rate;
+    const double phase_increment = 2.0 * PI * tone_hz / game->audio_sample_rate;
     
     for (u32 i = 0; i < frames_needed; i++) {
         // Generate sine wave sample
@@ -49,8 +49,8 @@ static void audio_callback(void* user_data, AudioQueueRef aq, AudioQueueBufferRe
 
         // Increment phase and wrap to prevent precision loss
         global_audio_state.phase += phase_increment;
-        if (global_audio_state.phase >= 2.0 * M_PI) {
-            global_audio_state.phase -= 2.0 * M_PI;
+        if (global_audio_state.phase >= 2.0 * PI) {
+            global_audio_state.phase -= 2.0 * PI;
         }
     }
 

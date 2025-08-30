@@ -1,5 +1,4 @@
 #include <math.h>
-#include <stdio.h>
 #include "def.h"
 #include "game.h"
 
@@ -52,7 +51,7 @@ void game_update_and_render() {
     usize vert_count = 3;
     float cx = WIDTH / 2.0f;
     float cy = HEIGHT / 2.0f;
-    float dangle = 2 * M_PI / vert_count;
+    float dangle = 2 * PI / vert_count;
     float mag = cx / 2;
 
     olivec_triangle3c(
@@ -64,7 +63,7 @@ void game_update_and_render() {
         RGBA(0, 255, 0, 255),
         RGBA(0, 0, 255, 255)
     );
-    angle += 2 * M_PI * DELTA_TIME;
+    angle += 2 * PI * DELTA_TIME;
 };
 
 void game_key_up([[maybe_unused]] int key) {

@@ -1,7 +1,13 @@
 #pragma once
 
 #include "def.h"
-#include <sys/time.h>
+
+#ifdef _WIN32
+#include <windows.h>
+#include <stdint.h>
+#else
+#include <time.h>
+#endif
 
 #define NANOS_PER_SEC (1000*1000*1000)
 
@@ -16,8 +22,8 @@ static inline u64 current_time_nanos(void) {
     }
 
     uint64_t Secs  = Time.QuadPart / Frequency.QuadPart;
-    uint64_t Nanos = Time.QuadPart % Frequency.QuadPart * NOB_NANOS_PER_SEC / Frequency.QuadPart;
-    return NOB_NANOS_PER_SEC * Secs + Nanos;
+    uint64_t Nanos = Time.QuadPart % Frequency.QuadPart * NANOS_PER_SEC / Frequency.QuadPart;
+    return NANOS_PER_SEC * Secs + Nanos;
 #else
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);

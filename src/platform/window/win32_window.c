@@ -1,0 +1,317 @@
+#include <windows.h>
+#include <windowsx.h>
+#include "game.h"
+#include "window.h"
+
+static struct {
+    HWND h_wnd;
+    HBITMAP h_bitmap;
+    HDC hdc;
+    Game* game;
+    bool should_close;
+    bool is_resizable;
+} g_window_state;
+
+/**
+ * @brief Input state tracking structure
+ */
+static struct {
+    bool keys[WINDOW_KEY_COUNT];
+    bool mouse_buttons[3];
+    int mouse_x, mouse_y;
+} g_input_state;
+
+/**
+ * @brief Extended bitmap info structure that includes color masks for BI_BITFIELDS
+ */
+struct {
+    BITMAPINFOHEADER header;
+    DWORD masks[4]; // R, G, B, A masks for BI_BITFIELDS
+} g_custom_bitmap_info;
+
+/**
+ * @brief Map Win32 virtual key codes to our key constants
+ */
+static void update_key_state(WPARAM wParam, bool is_pressed) {
+    switch (wParam) {
+        case VK_ESCAPE:
+            g_input_state.keys[WINDOW_KEY_ESCAPE] = is_pressed;
+            break;
+        case VK_SPACE:
+            g_input_state.keys[WINDOW_KEY_SPACE] = is_pressed;
+            break;
+        case 'A':
+            g_input_state.keys[WINDOW_KEY_A] = is_pressed;
+            break;
+        case 'D':
+            g_input_state.keys[WINDOW_KEY_D] = is_pressed;
+            break;
+        case 'S':
+            g_input_state.keys[WINDOW_KEY_S] = is_pressed;
+            break;
+        case 'W':
+            g_input_state.keys[WINDOW_KEY_W] = is_pressed;
+            break;
+        default:
+            break;
+    }
+}
+
+/**
+ * @brief The main window procedure that handles messages
+ */
+LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    switch (uMsg) {
+        case WM_CLOSE:
+            g_window_state.should_close = true;
+            DestroyWindow(hWnd);
+            break;
+        case WM_DESTROY:
+            PostQuitMessage(0);
+            break;
+        case WM_KEYDOWN:
+        case WM_SYSKEYDOWN:
+            update_key_state(wParam, true);
+            break;
+        case WM_KEYUP:
+        case WM_SYSKEYUP:
+            update_key_state(wParam, false);
+            break;
+        case WM_LBUTTONDOWN:
+            g_input_state.mouse_buttons[WINDOW_MOUSE_LEFT] = true;
+            break;
+        case WM_LBUTTONUP:
+            g_input_state.mouse_buttons[WINDOW_MOUSE_LEFT] = false;
+            break;
+        case WM_RBUTTONDOWN:
+            g_input_state.mouse_buttons[WINDOW_MOUSE_RIGHT] = true;
+            break;
+        case WM_RBUTTONUP:
+            g_input_state.mouse_buttons[WINDOW_MOUSE_RIGHT] = false;
+            break;
+        case WM_MBUTTONDOWN:
+            g_input_state.mouse_buttons[WINDOW_MOUSE_MIDDLE] = true;
+            break;
+        case WM_MBUTTONUP:
+            g_input_state.mouse_buttons[WINDOW_MOUSE_MIDDLE] = false;
+            break;
+        case WM_MOUSEMOVE:
+            g_input_state.mouse_x = GET_X_LPARAM(lParam);
+            g_input_state.mouse_y = GET_Y_LPARAM(lParam);
+            break;
+        case WM_SIZE:
+            // This is handled by window_set_size directly, but for completeness
+            // if we wanted to auto-resize the framebuffer we'd handle it here.
+            break;
+        default:
+            return DefWindowProc(hWnd, uMsg, wParam, lParam);
+    }
+    return 0;
+}
+
+/**
+ * @brief Initialize the window system with a game instance
+ */
+void window_init(Game* game) {
+    g_window_state.game = game;
+
+    // Get the current instance handle
+    HINSTANCE hInstance = GetModuleHandle(NULL);
+
+    // Define the window class
+    WNDCLASS wc = {};
+    wc.lpfnWndProc = WindowProc;
+    wc.hInstance = hInstance;
+    wc.lpszClassName = "GameWindowClass";
+    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+
+    // Register the window class
+    if (!RegisterClass(&wc)) {
+        fprintf(stderr, "Error: Failed to register window class\n");
+        return;
+    }
+
+    // Create the window
+    DWORD dwStyle = WS_OVERLAPPEDWINDOW;
+    RECT rect = { 0, 0, g_window_state.game->display_width, g_window_state.game->display_height };
+    AdjustWindowRect(&rect, dwStyle, FALSE);
+
+    g_window_state.h_wnd = CreateWindowEx(
+        0,
+        "GameWindowClass",
+        g_window_state.game->title,
+        dwStyle,
+        CW_USEDEFAULT, CW_USEDEFAULT,
+        rect.right - rect.left,
+        rect.bottom - rect.top,
+        NULL,
+        NULL,
+        hInstance,
+        NULL
+    );
+
+    if (!g_window_state.h_wnd) {
+        fprintf(stderr, "Error: Failed to create window\n");
+        return;
+    }
+
+    // Set up the bitmap info for rendering
+    g_custom_bitmap_info.header.biSize = sizeof(BITMAPINFOHEADER);
+    g_custom_bitmap_info.header.biWidth = g_window_state.game->display_width;
+    g_custom_bitmap_info.header.biHeight = -g_window_state.game->display_height; // Negative for top-down DIB
+    g_custom_bitmap_info.header.biPlanes = 1;
+    g_custom_bitmap_info.header.biBitCount = 32;
+    g_custom_bitmap_info.header.biCompression = BI_BITFIELDS;
+    g_custom_bitmap_info.masks[0] = 0x000000FF; // Red mask   (bits 7-0)
+    g_custom_bitmap_info.masks[1] = 0x0000FF00; // Green mask (bits 15-8)  
+    g_custom_bitmap_info.masks[2] = 0x00FF0000; // Blue mask  (bits 23-16)
+    g_custom_bitmap_info.masks[3] = 0xFF000000; // Alpha mask (bits 31-24)
+
+    // Get a device context for the window
+    g_window_state.hdc = GetDC(g_window_state.h_wnd);
+
+    // Show the window
+    ShowWindow(g_window_state.h_wnd, SW_SHOWDEFAULT);
+    UpdateWindow(g_window_state.h_wnd);
+}
+
+/**
+ * @brief Clean up window resources
+ */
+void window_cleanup(void) {
+    if (g_window_state.hdc) {
+        ReleaseDC(g_window_state.h_wnd, g_window_state.hdc);
+        g_window_state.hdc = NULL;
+    }
+    if (g_window_state.h_bitmap) {
+        DeleteObject(g_window_state.h_bitmap);
+        g_window_state.h_bitmap = NULL;
+    }
+    if (g_window_state.h_wnd) {
+        DestroyWindow(g_window_state.h_wnd);
+        g_window_state.h_wnd = NULL;
+    }
+}
+
+/**
+ * @brief Check if the window should close
+ */
+bool window_should_close(void) {
+    return g_window_state.should_close;
+}
+
+/**
+ * @brief Process pending window events
+ */
+void window_poll_events(void) {
+    MSG msg;
+    while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+}
+
+/**
+ * @brief Get the state of a keyboard key
+ */
+bool window_get_key_state(WindowKey key) {
+    if (key >= 0 && key < WINDOW_KEY_COUNT) {
+        return g_input_state.keys[key];
+    }
+    return false;
+}
+
+/**
+ * @brief Get the current mouse position
+ */
+void window_get_mouse_position(int* x, int* y) {
+    if (x) *x = g_input_state.mouse_x;
+    if (y) *y = g_input_state.mouse_y;
+}
+
+/**
+ * @brief Get the state of a mouse button
+ */
+bool window_get_mouse_button_state(int button) {
+    if (button >= 0 && button < 3) {
+        return g_input_state.mouse_buttons[button];
+    }
+    return false;
+}
+
+/**
+ * @brief Set the window title
+ */
+void window_set_title(const char* title) {
+    if (g_window_state.h_wnd && title) {
+        SetWindowText(g_window_state.h_wnd, title);
+    }
+}
+
+/**
+ * @brief Get the current window size
+ */
+void window_get_size(int* width, int* height) {
+    if (!g_window_state.h_wnd) {
+        if (width) *width = 0;
+        if (height) *height = 0;
+        return;
+    }
+
+    RECT client_rect;
+    GetClientRect(g_window_state.h_wnd, &client_rect);
+    if (width) *width = client_rect.right - client_rect.left;
+    if (height) *height = client_rect.bottom - client_rect.top;
+}
+
+/**
+ * @brief Set the window size
+ */
+void window_set_size(int width, int height) {
+    if (!g_window_state.h_wnd) return;
+
+    RECT rect = { 0, 0, width, height };
+    DWORD dwStyle = GetWindowLong(g_window_state.h_wnd, GWL_STYLE);
+    AdjustWindowRect(&rect, dwStyle, FALSE);
+
+    SetWindowPos(g_window_state.h_wnd, NULL, 0, 0, rect.right - rect.left, rect.bottom - rect.top, SWP_NOMOVE | SWP_NOZORDER);
+}
+
+/**
+ * @brief Set whether the window is resizable
+ */
+void window_set_resizable(bool resizable) {
+    if (!g_window_state.h_wnd) return;
+    
+    DWORD dwStyle = GetWindowLong(g_window_state.h_wnd, GWL_STYLE);
+    if (resizable) {
+        dwStyle |= WS_THICKFRAME;
+    } else {
+        dwStyle &= ~WS_THICKFRAME;
+    }
+    
+    SetWindowLong(g_window_state.h_wnd, GWL_STYLE, dwStyle);
+}
+
+/**
+ * @brief Present the framebuffer to the screen
+ */
+void window_present(void) {
+    if (!g_window_state.h_wnd || !g_window_state.game || !g_window_state.game->display) return;
+    
+    RECT client_rect;
+    GetClientRect(g_window_state.h_wnd, &client_rect);
+
+    StretchDIBits(
+        g_window_state.hdc,
+        0, 0,
+        client_rect.right, client_rect.bottom,
+        0, 0,
+        g_window_state.game->display_width, g_window_state.game->display_height,
+        g_window_state.game->display,
+        (const BITMAPINFO*)&g_custom_bitmap_info,
+        DIB_RGB_COLORS,
+        SRCCOPY
+    );
+}

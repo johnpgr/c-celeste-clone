@@ -1,6 +1,8 @@
 #pragma once
+
 #include <stdint.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 #define i8 int8_t
@@ -13,6 +15,8 @@
 #define u32 uint32_t
 #define u64 uint64_t
 #define usize size_t
+
+#define PI 3.14159265358979323846
 
 #define ARRAY_LEN(arr) (sizeof(arr) / sizeof((arr)[0]))
 #define RGBA(r, g, b, a) ((((r)&0xFF)<<(8*0)) | (((g)&0xFF)<<(8*1)) | (((b)&0xFF)<<(8*2)) | (((a)&0xFF)<<(8*3)))

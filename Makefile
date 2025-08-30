@@ -11,7 +11,7 @@ ifeq ($(UNAME_S), Darwin)
     PLATFORM := osx
 else ifeq ($(UNAME_S), Linux)
     PLATFORM := linux
-else ifeq ($(findstring MINGW, $(UNAME_S)), MINGW)
+else ifeq ($(findstring MSYS_NT, $(UNAME_S)), MSYS_NT)
     PLATFORM := win32
 else
     $(error Unsupported platform: $(UNAME_S))
@@ -25,11 +25,11 @@ ifeq ($(PLATFORM), osx)
 else ifeq ($(PLATFORM), linux)
     CC := gcc
     CFLAGS := -std=c23 -g -Wall -Wextra -Wno-unused-variable -Wno-unused-function
-    LDLIBS := -lX11 -lGL -lm
+    LDLIBS := -lX11 -lm
 else ifeq ($(PLATFORM), win32)
-    CC := gcc  # Or clang if preferred
+    CC := clang
     CFLAGS := -std=c23 -g -Wall -Wextra -Wno-unused-variable -Wno-unused-function
-    LDLIBS := -lgdi32 -luser32 -lkernel32
+    LDLIBS := -lgdi32 -luser32 -lkernel32 -ldsound
     TARGET_SUFFIX := .exe
 endif
 

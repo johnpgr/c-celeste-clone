@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include "game.h"
 #include "window.h"
 #include "audio.h"

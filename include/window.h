@@ -1,4 +1,5 @@
 #pragma once
+
 #include "game.h"
 
 /**
@@ -118,12 +119,3 @@ void window_set_resizable(bool resizable);
  * manual control.
  */
 void window_present(void);
-
-/**
- * @brief Set vertical synchronization
- * @param enabled true to enable vsync, false to disable
- * 
- * Note: On macOS, this controls the display link timing
- * rather than traditional vsync.
- */
-void window_set_vsync(bool enabled);

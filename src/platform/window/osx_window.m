@@ -259,8 +259,6 @@ typedef struct {
 @property (nonatomic) InputState inputState;
 /** Should close flag */
 @property (nonatomic) bool shouldClose;
-/** VSync enabled flag */
-@property (nonatomic) bool vsyncEnabled;
 /** Create and display the window manually */
 - (void)createWindow;
 @end
@@ -275,7 +273,6 @@ typedef struct {
     if (self) {
         memset(&_inputState, 0, sizeof(InputState));
         _shouldClose = false;
-        _vsyncEnabled = false;
     }
     return self;
 }
