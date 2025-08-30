@@ -1,4 +1,5 @@
 #import <Cocoa/Cocoa.h>
+#include <CoreGraphics/CGImage.h>
 #include "game.h"
 #include "window.h"
 
@@ -200,7 +201,7 @@ typedef struct {
         8,                                     // Bits per component (R, G, B, A)
         self.game->display_width * 4,          // Bytes per row (4 bytes per pixel)
         colorSpace,
-        kCGImageAlphaPremultipliedLast
+        kCGImageAlphaPremultipliedFirst | kCGImageByteOrder32Little
     );
 
     if (bitmapContext) {

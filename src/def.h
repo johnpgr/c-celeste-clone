@@ -15,7 +15,7 @@
 #define usize size_t
 
 #define ARRAY_LEN(arr) (sizeof(arr) / sizeof((arr)[0]))
-#define RGBA(r, g, b, a) (((u32)(r) << 24) | ((u32)(g) << 16) | ((u32)(b) << 8) | ((u32)(a)))
+#define RGBA(r, g, b, a) ((((r)&0xFF)<<(8*0)) | (((g)&0xFF)<<(8*1)) | (((b)&0xFF)<<(8*2)) | (((a)&0xFF)<<(8*3)))
 
 #define TODO(msg) do { \
     fprintf(stderr, "%s:%d:%d [TODO][%s()] %s\n", __FILE__, __LINE__, 1, __func__, msg); \

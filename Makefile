@@ -1,5 +1,5 @@
 CC = clang
-CFLAGS = -std=c23 -g -Wall -Wextra -Wno-unused-variable -Wno-unused-function -framework Cocoa
+CFLAGS = -std=c23 -g -Wall -Wextra -Wno-unused-variable -Wno-unused-function -framework Cocoa -framework AudioToolbox
 SRC = $(wildcard src/*.c src/*.m)
 TARGET = build/software-rendering-c
 

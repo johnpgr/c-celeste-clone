@@ -1,47 +1,55 @@
-#include "game.h"
-#include "window.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/time.h>
+#include <unistd.h>
+#include "game.h"
+#include "window.h"
+#include "audio.h"
+#include "utils.h"
 
-int main(int argc, [[maybe_unused]] char* argv[argc+1]) {
+int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
     Game game = game_init();
 
     window_init(&game);
-    /* window_set_vsync(true); */
+    window_set_vsync(true);
+    audio_init(&game);
 
-    struct timeval last_time;
-    gettimeofday(&last_time, NULL);
-    int frames = 0;
-    double fps_display_interval = 1.0;
+    const u64 NANOS_PER_UPDATE = NANOS_PER_SEC / game.fps;
+    u64 accumulator = 0;
+    u64 last_time = current_time_nanos();
+
+    u64 frame_count = 0;
+    u64 fps_timer_start = current_time_nanos();
     
     while (!window_should_close()) {
+        u64 current_time = current_time_nanos();
+        u64 delta_time = current_time - last_time;
+        last_time = current_time;
+        accumulator += delta_time;
+
         window_poll_events();
         
         // Check input state
         if (window_get_key_state(WINDOW_KEY_ESCAPE)) {
             break;
         }
-        
-        game_update();
-        window_present();
-        frames++;
 
-        struct timeval current_time;
-        gettimeofday(&current_time, NULL);
+        while (accumulator >= NANOS_PER_UPDATE) {
+            game_update();
+            window_present();
 
-        double elapsed_time = (current_time.tv_sec - last_time.tv_sec) + 
-            (current_time.tv_usec - last_time.tv_usec) / 1000000.0;
+            accumulator -= NANOS_PER_UPDATE;
 
-        if (elapsed_time >= fps_display_interval) {
-            double fps = frames / elapsed_time;
-            printf("FPS: %.2f\n", fps);
-
-            last_time = current_time;
-            frames = 0;
+            frame_count++;
+            if(current_time - fps_timer_start >= NANOS_PER_SEC) {
+                double fps = (double)frame_count * NANOS_PER_SEC / (current_time - fps_timer_start);
+                printf("FPS: %.2f\n", fps);
+                frame_count = 0;
+                fps_timer_start = current_time;
+            }
         }
     }
 
+    audio_cleanup();
     window_cleanup();
     return EXIT_SUCCESS;
 }
