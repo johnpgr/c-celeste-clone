@@ -14,9 +14,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
 
     const u64 NANOS_PER_UPDATE = NANOS_PER_SEC / game.fps;
     u64 accumulator = 0;
-    u64 last_time = current_time_nanos();
-
     u64 frame_count = 0;
+    u64 last_time = current_time_nanos();
     u64 fps_timer_start = current_time_nanos();
     
     while (!window_should_close()) {
