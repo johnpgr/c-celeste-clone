@@ -10,7 +10,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
     Game game = game_init();
 
     window_init(&game);
-    window_set_vsync(true);
     audio_init(&game);
 
     const u64 NANOS_PER_UPDATE = NANOS_PER_SEC / game.fps;
@@ -34,7 +33,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
         }
 
         while (accumulator >= NANOS_PER_UPDATE) {
-            game_update();
+            game_update_and_render();
             window_present();
 
             accumulator -= NANOS_PER_UPDATE;

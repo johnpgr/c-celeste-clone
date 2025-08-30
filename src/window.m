@@ -1,11 +1,6 @@
 #import <Cocoa/Cocoa.h>
-#include <CoreGraphics/CGImage.h>
 #include "game.h"
 #include "window.h"
-
-// TODO: Store the bitmapContext in a instance variable so that it's not recreated every frame.
-// TODO: Make a window_resize() function
-// TODO: Make a window_target_fps() function to cap the framerate
 
 /**
  * @file window.m
@@ -32,19 +27,23 @@ typedef struct {
  * into a displayable image using Core Graphics. It handles coordinate
  * system conversion and input event tracking.
  */
-@interface GameView : NSView
-/** Pointer to the game instance containing the framebuffer */
+@interface GameView : NSView {
+    CGColorSpaceRef color_space;
+    CGContextRef bitmap_context;
+    usize bitmap_width;
+    usize bitmap_height;
+    usize bytes_per_row;
+}
 @property (nonatomic) Game* game;
-/** Pointer to input state tracking */
 @property (nonatomic) InputState* inputState;
+
+/** Designated initializer that accepts the Game pointer and creates a bitmap context that wraps the game's framebuffer. */
+- (instancetype)initWithFrame:(NSRect)frame game:(Game*)game;
+
 @end
 
 @implementation GameView
-
-/**
- * @brief Initialize the view and enable mouse tracking
- */
-- (instancetype)initWithFrame:(NSRect)frame {
+- (instancetype)initWithFrame:(NSRect)frame game:(Game*)game {
     self = [super initWithFrame:frame];
     if (self) {
         // Create tracking area for mouse events
@@ -54,8 +53,45 @@ typedef struct {
             owner:self
             userInfo:nil];
         [self addTrackingArea:trackingArea];
+
+        // Store game pointer and create a bitmap context that uses the game's pixel buffer directly.
+        self.game = game;
+        if (game && game->display) {
+            bitmap_width = (usize)game->display_width;
+            bitmap_height = (usize)game->display_height;
+            bytes_per_row = bitmap_width * 4;
+
+            color_space = CGColorSpaceCreateDeviceRGB();
+            // Use the game's persistent framebuffer as the context data pointer so we avoid internal CG allocations/copies.
+            bitmap_context = CGBitmapContextCreate(
+                (void*)game->display,       // use game's framebuffer memory directly
+                (size_t)bitmap_width,
+                (size_t)bitmap_height,
+                8,                         // bits per component
+                (size_t)bytes_per_row,
+                color_space,
+                kCGImageAlphaPremultipliedFirst | kCGImageByteOrder32Little
+            );
+        } else {
+            color_space = NULL;
+            bitmap_context = NULL;
+            bitmap_width = bitmap_height = bytes_per_row = 0;
+        }
     }
     return self;
+}
+
+- (void)dealloc {
+    [super dealloc];
+
+    if (bitmap_context) {
+        CGContextRelease(bitmap_context);
+        bitmap_context = NULL;
+    }
+    if (color_space) {
+        CGColorSpaceRelease(color_space);
+        color_space = NULL;
+    }
 }
 
 /**
@@ -178,58 +214,39 @@ typedef struct {
 /**
  * @brief Renders the game's framebuffer to the view
  * @param dirtyRect The rectangle that needs to be redrawn (unused)
- * 
+ *
  * This method is called by Cocoa whenever the view needs to be redrawn.
- * It creates a CGBitmapContext from the game's framebuffer data and
- * draws it to the view, handling coordinate system conversion.
+ * It memcpy's the game's framebuffer into the persistent bitmap context's
+ * buffer (allocated by CoreGraphics) and creates a CGImage from it for display.
  */
 - (void)drawRect:(NSRect)dirtyRect {
-    if (!self.game) return;
+
+    if (!self.game || !bitmap_context) return;
 
     NSGraphicsContext* context = [NSGraphicsContext currentContext];
     CGContextRef cgContext = [context CGContext];
 
-    // Create color space for RGB display
-    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
-    
-    // Create bitmap context from game's framebuffer
-    // The game's display buffer is RGBA32 with premultiplied alpha
-    CGContextRef bitmapContext = CGBitmapContextCreate(
-        self.game->display,                    // Framebuffer data
-        self.game->display_width,              // Width in pixels
-        self.game->display_height,             // Height in pixels
-        8,                                     // Bits per component (R, G, B, A)
-        self.game->display_width * 4,          // Bytes per row (4 bytes per pixel)
-        colorSpace,
-        kCGImageAlphaPremultipliedFirst | kCGImageByteOrder32Little
-    );
+    // The bitmap_context wraps the game's framebuffer directly (no memcpy). Just create an image and draw it.
+    CGImageRef image = CGBitmapContextCreateImage(bitmap_context);
+    if (image) {
+        CGContextSaveGState(cgContext);
 
-    if (bitmapContext) {
-        // Create image from bitmap context
-        CGImageRef image = CGBitmapContextCreateImage(bitmapContext);
-        if (image) {
-            CGContextSaveGState(cgContext);
+        // Draw the image to fill the entire view bounds
+        CGContextDrawImage(cgContext, self.bounds, image);
 
-            // Draw the image to fill the entire view bounds
-            CGContextDrawImage(cgContext, self.bounds, image);
-
-            CGContextRestoreGState(cgContext);
-            CGImageRelease(image);
-        }
-        CGContextRelease(bitmapContext);
+        CGContextRestoreGState(cgContext);
+        CGImageRelease(image);
     }
-
-    CGColorSpaceRelease(colorSpace);
 }
 
 @end
 
 /**
- * @brief Application delegate handling window lifecycle and game loop
+ * @brief Application delegate handling window lifecycle
  * 
  * AppDelegate manages the main window, sets up the application menu,
- * and runs the game loop timer. It implements NSApplicationDelegate
- * and NSWindowDelegate protocols to handle application and window events.
+ * It implements NSApplicationDelegate and NSWindowDelegate protocols
+ * to handle application and window events.
  */
 @interface AppDelegate : NSObject <NSApplicationDelegate, NSWindowDelegate>
 /** The main application window */
@@ -238,8 +255,6 @@ typedef struct {
 @property (nonatomic, strong) GameView* gameView;
 /** Pointer to the game instance */
 @property (nonatomic) Game* game;
-/** Game loop timer */
-@property (nonatomic, strong) NSTimer* gameTimer;
 /** Input state tracking */
 @property (nonatomic) InputState inputState;
 /** Should close flag */
@@ -301,7 +316,7 @@ typedef struct {
     [self.window center];
     
     // Create and configure the game view
-    self.gameView = [[GameView alloc] initWithFrame:frame];
+    self.gameView = [[GameView alloc] initWithFrame:frame game:self.game];
     self.gameView.game = self.game;
     self.gameView.inputState = &_inputState;
     
@@ -314,50 +329,6 @@ typedef struct {
     [self.window makeFirstResponder:self.gameView];
 }
 
-/**
- * @brief Called when the application finishes launching (now unused)
- */
-- (void)applicationDidFinishLaunching:(NSNotification*)notification {
-    // Window creation is now handled manually in createWindow
-}
-
-/**
- * @brief Start the game loop timer
- */
-- (void)startGameLoop {
-    if (self.gameTimer) {
-        [self.gameTimer invalidate];
-    }
-    
-    double interval = 1.0 / self.game->fps;
-    self.gameTimer = [NSTimer scheduledTimerWithTimeInterval:interval
-                                                      target:self
-                                                    selector:@selector(gameLoop:)
-                                                    userInfo:nil
-                                                     repeats:YES];
-}
-
-/**
- * @brief Stop the game loop timer
- */
-- (void)stopGameLoop {
-    if (self.gameTimer) {
-        [self.gameTimer invalidate];
-        self.gameTimer = nil;
-    }
-}
-
-/**
- * @brief Game loop callback called by the timer
- * @param timer The timer that triggered this call (unused)
- * 
- * Updates the game logic and triggers a redraw of the game view.
- * This method is called at the frequency specified by the game's FPS setting.
- */
-- (void)gameLoop:(NSTimer*)timer {
-    game_update();  // Update game logic
-    [self.gameView setNeedsDisplay:YES];  // Trigger a redraw
-}
 
 /**
  * @brief Determines if the application should terminate when the last window closes
@@ -372,11 +343,18 @@ typedef struct {
  * @brief Called when the window is about to close
  * @param notification Notification object (unused)
  * 
- * Sets the should close flag and stops the game loop.
+ * Sets the should close flag
  */
 - (void)windowWillClose:(NSNotification*)notification {
     self.shouldClose = true;
-    [self stopGameLoop];
+}
+
+/**
+ * @brief Called when the window has been resized
+ */
+- (void)windowDidResize:(NSNotification*)notification {
+    // Resize handling removed: framebuffer is fixed-size and bitmap context wraps the game's buffer.
+    (void)notification;
 }
 
 /**
@@ -456,7 +434,6 @@ void window_init(Game* game) {
 void window_cleanup(void) {
     @autoreleasepool {
         if (appDelegate) {
-            [appDelegate stopGameLoop];
             appDelegate = nil;
         }
     }
@@ -604,18 +581,5 @@ void window_present(void) {
     @autoreleasepool {
         [appDelegate.gameView setNeedsDisplay:YES];
         [appDelegate.gameView displayIfNeeded]; // Force immediate draw
-    }
-}
-
-/**
- * @brief Set vertical synchronization
- */
-void window_set_vsync(bool enabled) {
-    if (!appDelegate) return;
-    
-    appDelegate.vsyncEnabled = enabled;
-    // Restart game loop with new timing if needed
-    if (appDelegate.gameTimer) {
-        [appDelegate startGameLoop];
     }
 }

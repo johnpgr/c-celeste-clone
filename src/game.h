@@ -15,8 +15,6 @@ typedef struct {
 } Game;
 
 Game game_init(void);
-void game_update(void);
+void game_update_and_render(void);
 void game_key_up(int key);
 void game_key_down(int key);
-void game_display_pixel(Game* game, u32 x, u32 y, u32 value);
-void game_display_debug(Game* game);
