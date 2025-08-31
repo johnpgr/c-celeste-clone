@@ -12,7 +12,7 @@
  * @param format The format string, similar to printf.
  * @param ... The variable arguments to be formatted.
  */
-inline void LOG(const char* format, ...) {
+inline void debug_print(const char* format, ...) {
     const int buffer_size = 1024;
     char buffer[buffer_size];
     

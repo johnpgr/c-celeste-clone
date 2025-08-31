@@ -1,66 +1,117 @@
 #import <AudioToolbox/AudioToolbox.h>
 #include "audio.h"
 #include "game.h"
+#include <pthread.h>
 
-#define NUM_BUFFERS 3
+typedef struct {
+    i16* data;
+    usize capacity;
+    usize write_pos;
+    usize read_pos;
+    usize available;
+    pthread_mutex_t mutex;
+} RingBuffer;
 
-static struct {
+internal struct {
     Game* game;
     AudioQueueRef queue;
-    AudioQueueBufferRef buffers[NUM_BUFFERS];
-    double phase; // Track phase continuously
+    AudioQueueBufferRef buffers[AUDIO_CHANNELS];
+    RingBuffer ring_buffer;
+    bool initialized;
 } global_audio_state;
 
-/**
- * @brief The callback function that Audio Queue Services calls to get more audio data.
- * This now generates audio directly instead of copying from a shared buffer.
- */
-static void audio_callback(void* user_data, AudioQueueRef aq, AudioQueueBufferRef buffer) {
+internal void ring_buffer_init(RingBuffer* rb, usize capacity) {
+    // TODO: Handle allocations with our own allocator
+    rb->data = calloc(capacity, sizeof(i16));
+    rb->capacity = capacity;
+    rb->write_pos = 0;
+    rb->read_pos = 0;
+    rb->available = 0;
+    pthread_mutex_init(&rb->mutex, NULL);
+}
+
+internal void ring_buffer_destroy(RingBuffer* rb) {
+    pthread_mutex_destroy(&rb->mutex);
+    free(rb->data);
+    rb->data = NULL;
+}
+
+internal usize ring_buffer_write(RingBuffer* rb, const i16* data, usize samples) {
+    pthread_mutex_lock(&rb->mutex);
+    
+    usize space_available = rb->capacity - rb->available;
+    usize samples_to_write = (samples < space_available) ? samples : space_available;
+    
+    for (usize i = 0; i < samples_to_write; i++) {
+        rb->data[rb->write_pos] = data[i];
+        rb->write_pos = (rb->write_pos + 1) % rb->capacity;
+    }
+    
+    rb->available += samples_to_write;
+    
+    pthread_mutex_unlock(&rb->mutex);
+    return samples_to_write;
+}
+
+internal usize ring_buffer_read(RingBuffer* rb, i16* data, usize samples) {
+    pthread_mutex_lock(&rb->mutex);
+    
+    usize samples_to_read = (samples < rb->available) ? samples : rb->available;
+    
+    for (usize i = 0; i < samples_to_read; i++) {
+        data[i] = rb->data[rb->read_pos];
+        rb->read_pos = (rb->read_pos + 1) % rb->capacity;
+    }
+    
+    rb->available -= samples_to_read;
+    
+    pthread_mutex_unlock(&rb->mutex);
+    return samples_to_read;
+}
+
+internal void audio_callback(void* user_data, AudioQueueRef aq, AudioQueueBufferRef buffer) {
     Game* game = (Game*)user_data;
-    if(!game) {
+    if (!game || !global_audio_state.initialized) {
         memset(buffer->mAudioData, 0, buffer->mAudioDataBytesCapacity);
         buffer->mAudioDataByteSize = buffer->mAudioDataBytesCapacity;
-        AudioQueueEnqueueBuffer(aq, buffer, 0, nullptr);
+        AudioQueueEnqueueBuffer(aq, buffer, 0, NULL);
         return;
     }
 
     i16* audio_data = (i16*)buffer->mAudioData;
     u32 frames_needed = game->audio_sample_rate / game->fps;
-    u32 buffer_size = frames_needed * game->audio_channels * sizeof(i16);
+    u32 total_samples = frames_needed * game->audio_channels;
+    u32 buffer_size = total_samples * sizeof(i16);
     
-    // Ensure we don't exceed buffer capacity
     if (buffer_size > buffer->mAudioDataBytesCapacity) {
         buffer_size = buffer->mAudioDataBytesCapacity;
-        frames_needed = buffer_size / (game->audio_channels * sizeof(i16));
+        total_samples = buffer_size / sizeof(i16);
+        frames_needed = total_samples / game->audio_channels;
     }
 
-    // Generate audio directly in the callback
-    const double tone_hz = 440.0;
-    const double phase_increment = 2.0 * PI * tone_hz / game->audio_sample_rate;
+    usize samples_read = ring_buffer_read(&global_audio_state.ring_buffer, audio_data, total_samples);
     
-    for (u32 i = 0; i < frames_needed; i++) {
-        // Generate sine wave sample
-        float sample   = sinf((float)global_audio_state.phase) * 0.1f;
-        i16 sample_i16 = (i16)(sample * 32767.0f);
-
-        // Fill both channels (stereo)
-        audio_data[i * game->audio_channels + 0] = sample_i16; // Left
-        audio_data[i * game->audio_channels + 1] = sample_i16; // Right
-
-        // Increment phase and wrap to prevent precision loss
-        global_audio_state.phase += phase_increment;
-        if (global_audio_state.phase >= 2.0 * PI) {
-            global_audio_state.phase -= 2.0 * PI;
+    if (samples_read < total_samples) {
+        memset(audio_data + samples_read, 0, (total_samples - samples_read) * sizeof(i16));
+    }
+    
+    if (game->audio_volume != 1.0f) {
+        for (u32 i = 0; i < samples_read; i++) {
+            audio_data[i] = (i16)((float)audio_data[i] * game->audio_volume);
         }
     }
 
     buffer->mAudioDataByteSize = buffer_size;
-    AudioQueueEnqueueBuffer(aq, buffer, 0, nullptr);
+    AudioQueueEnqueueBuffer(aq, buffer, 0, NULL);
 }
 
 void audio_init(Game* game) {
-    global_audio_state.game  = game;
-    global_audio_state.phase = 0.0;
+    memset(&global_audio_state, 0, sizeof(global_audio_state));
+    global_audio_state.game = game;
+    game->audio_volume = 1.0f;
+
+    usize ring_buffer_capacity = game->audio_sample_rate * game->audio_channels;
+    ring_buffer_init(&global_audio_state.ring_buffer, ring_buffer_capacity);
 
     AudioStreamBasicDescription format = {
         .mSampleRate       = game->audio_sample_rate,
@@ -73,35 +124,73 @@ void audio_init(Game* game) {
         .mBytesPerFrame    = game->audio_channels * sizeof(i16),
     };
 
-    OSStatus status = AudioQueueNewOutput(&format, audio_callback, game, nullptr, nullptr, 0, &global_audio_state.queue);
-    if(status != noErr) {
-        LOG("Error: Could not create audio queue\n");
+    OSStatus status = AudioQueueNewOutput(
+        &format,
+        audio_callback,
+        game,
+        NULL,
+        NULL,
+        0,
+        &global_audio_state.queue
+    );
+    
+    if (status != noErr) {
+        debug_print("Error: Could not create audio queue (status: %d)\n", (int)status);
         return;
     }
 
     u32 buffer_size = game->audio_channels * (game->audio_sample_rate / game->fps) * sizeof(i16);
-    for (int i = 0; i < NUM_BUFFERS; i++) {
+    for (int i = 0; i < AUDIO_CHANNELS; i++) {
         status = AudioQueueAllocateBuffer(global_audio_state.queue, buffer_size, &global_audio_state.buffers[i]);
         if (status == noErr) {
-            // Initialize buffers with silence
             memset(global_audio_state.buffers[i]->mAudioData, 0, buffer_size);
             global_audio_state.buffers[i]->mAudioDataByteSize = buffer_size;
-            AudioQueueEnqueueBuffer(global_audio_state.queue, global_audio_state.buffers[i], 0, nullptr);
+            AudioQueueEnqueueBuffer(global_audio_state.queue, global_audio_state.buffers[i], 0, NULL);
         } else {
-            LOG("Error: Could not allocate audio buffer %d (status: %d)\n", i, (int)status);
+            debug_print("Error: Could not allocate audio buffer %d (status: %d)\n", i, (int)status);
+            return;
         }
     }
 
-    status = AudioQueueStart(global_audio_state.queue, nullptr);
+    status = AudioQueueStart(global_audio_state.queue, NULL);
     if (status != noErr) {
-        LOG("Error: Could not start audio queue (status: %d)\n", (int)status);
+        debug_print("Error: Could not start audio queue (status: %d)\n", (int)status);
+        return;
     }
+    
+    global_audio_state.initialized = true;
+    debug_print("Audio system initialized successfully\n");
+}
+
+void audio_update_buffer(Game* game) {
+    if (!global_audio_state.initialized || !game->audio) {
+        return;
+    }
+    
+    usize samples_written = ring_buffer_write(
+        &global_audio_state.ring_buffer,
+        game->audio,
+        AUDIO_CAPACITY
+    );
+    
+    if (samples_written < AUDIO_CAPACITY) {
+        debug_print("Ring buffer is full, some audio data was dropped\n");
+    }
+}
+
+void audio_set_volume(float volume) {
+    if (volume < 0.0f) volume = 0.0f;
+    if (volume > 1.0f) volume = 1.0f;
+    global_audio_state.game->audio_volume = volume;
 }
 
 void audio_cleanup(void) {
     if (global_audio_state.queue) {
         AudioQueueStop(global_audio_state.queue, true);
         AudioQueueDispose(global_audio_state.queue, true);
-        global_audio_state.queue = nullptr;
+        global_audio_state.queue = NULL;
     }
+    
+    ring_buffer_destroy(&global_audio_state.ring_buffer);
+    global_audio_state.initialized = false;
 }

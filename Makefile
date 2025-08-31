@@ -20,7 +20,7 @@ endif
 # Compiler settings based on platform
 ifeq ($(PLATFORM), osx)
     CC := clang
-    CFLAGS := -std=c23 -g -Wall -Wextra -Wno-unused-variable -Wno-unused-function
+    CFLAGS := -std=c23 -O3 -Wall -Wextra -Wno-unused-variable -Wno-unused-function
     LDLIBS := -framework Cocoa -framework AudioToolbox
 else ifeq ($(PLATFORM), linux)
     CC := clang
@@ -38,7 +38,7 @@ CFLAGS += -I$(INCLUDE_DIR) -I$(EXTERNAL_DIR)
 
 # Core source files
 CORE_SRC := $(wildcard $(SRC_DIR)/core/*.c)
-EXTERNAL_SRC := $(wildcard $(SRC_DIR)/external/*.c)
+EXTERNAL_SRC := $(SRC_DIR)/external/olive.c
 
 # Platform-specific sources
 ifeq ($(PLATFORM), osx)

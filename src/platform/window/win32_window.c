@@ -156,7 +156,7 @@ void window_init(Game* game) {
 
     // Register the window class
     if (!RegisterClass(&wc)) {
-        LOG("Error: Failed to register window class\n");
+        debug_print("Error: Failed to register window class\n");
         return;
     }
 
@@ -180,7 +180,7 @@ void window_init(Game* game) {
     );
 
     if (!g_window_state.h_wnd) {
-        LOG("Error: Failed to create window\n");
+        debug_print("Error: Failed to create window\n");
         return;
     }
 
