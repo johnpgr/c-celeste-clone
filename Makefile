@@ -23,7 +23,7 @@ ifeq ($(PLATFORM), osx)
     CFLAGS := -std=c23 -g -Wall -Wextra -Wno-unused-variable -Wno-unused-function
     LDLIBS := -framework Cocoa -framework AudioToolbox
 else ifeq ($(PLATFORM), linux)
-    CC := gcc
+    CC := clang
     CFLAGS := -std=c23 -g -Wall -Wextra -Wno-unused-variable -Wno-unused-function
     LDLIBS := -lX11 -lm
 else ifeq ($(PLATFORM), win32)
