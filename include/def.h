@@ -2,12 +2,13 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include <stdio.h>
 #include <stdarg.h>
-#include <stdlib.h>
+#include <stdio.h>
 
 #ifdef _WIN32
-    #include <windows.h>
+#include <windows.h>
+#else
+#include <stdlib.h>
 #endif
 
 #define i8 int8_t
@@ -56,7 +57,7 @@ inline void LOG(const char* format, ...) {
 #else
     va_list args;
     va_start(args, format);
-    printf(format, args);
+    fprintf(stderr, format, args);
     va_end(args);
 #endif
 }
