@@ -1393,7 +1393,8 @@ static void skip(vorb *z, int n)
    }
    #endif
 }
-
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wtautological-compare"
 static int set_file_offset(stb_vorbis *f, unsigned int loc)
 {
    #ifndef STB_VORBIS_NO_PUSHDATA_API
@@ -1424,7 +1425,7 @@ static int set_file_offset(stb_vorbis *f, unsigned int loc)
    return 0;
    #endif
 }
-
+#pragma clang diagnostic pop
 
 static uint8 ogg_page_header[4] = { 0x4f, 0x67, 0x67, 0x53 };
 
