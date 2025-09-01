@@ -22,6 +22,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
     };
     constexpr usize test_audio_size = sizeof(test_audio);
     AudioSource* test_ogg = game_load_ogg_static_from_memory(&game, test_audio, test_audio_size, false);
+    if (!test_ogg) {
+        debug_print("ERROR: Failed to load test_ogg\n");
+        return -1;
+    }
     test_ogg->volume = 0.5f;
     game_play_audio_source(test_ogg);
 
@@ -53,9 +57,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
 
 
         while (accumulator >= NANOS_PER_UPDATE) {
-            game_update_and_render(&game);
             game_generate_audio(&game);
             audio_update_buffer(&game);
+            game_update_and_render(&game);
             window_present();
 
             accumulator -= NANOS_PER_UPDATE;
@@ -64,7 +68,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
             if(current_time - fps_timer_start >= NANOS_PER_SEC) {
                 double fps = (double)frame_count * NANOS_PER_SEC /
                     (current_time - fps_timer_start);
-                /* debug_print("FPS: %.2f\n", fps); */
+                debug_print("FPS: %.2f\n", fps);
                 frame_count = 0;
                 fps_timer_start = current_time;
             }

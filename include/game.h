@@ -8,7 +8,7 @@
 #define WIDTH 800
 #define HEIGHT 600
 #define DISPLAY_CAPACITY (WIDTH * HEIGHT)
-#define AUDIO_SAMPLE_RATE 44100
+#define AUDIO_SAMPLE_RATE 48000
 #define AUDIO_CHANNELS 2
 #define AUDIO_CAPACITY ((AUDIO_SAMPLE_RATE / FPS) * AUDIO_CHANNELS)
 
@@ -87,3 +87,8 @@ void game_stop_audio_source(AudioSource* source);
 void game_set_audio_volume(AudioSource* source, float volume);
 void game_free_audio_source(AudioSource* source);
 void game_generate_audio(Game* game);
+void game_reset_transient_arena(void);
+void game_reset_permanent_arena(void);
+usize game_get_permanent_arena_usage(void);
+usize game_get_transient_arena_usage(void);
+void game_print_arena_stats(void);

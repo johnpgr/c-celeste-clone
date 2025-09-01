@@ -20,7 +20,7 @@ endif
 # Compiler settings based on platform
 ifeq ($(PLATFORM), osx)
     CC := clang
-    CFLAGS := -std=c23 -O3 -Wall -Wextra -Wno-unused-variable -Wno-unused-function
+    CFLAGS := -std=c23 -g -Wall -Wextra -Wno-unused-variable -Wno-unused-function
     LDLIBS := -framework Cocoa -framework AudioToolbox
 else ifeq ($(PLATFORM), linux)
     CC := clang
@@ -34,7 +34,10 @@ else ifeq ($(PLATFORM), win32)
     TARGET_SUFFIX := .exe
 endif
 
+# Common include paths
 CFLAGS += -I$(INCLUDE_DIR) -I$(EXTERNAL_DIR)
+# Common flags
+CFLAGS += -DDEBUG_ARENA_ALLOCATIONS=1 -DDEBUG_ARENA_RESETS=0
 
 # Core source files
 CORE_SRC := $(wildcard $(SRC_DIR)/core/*.c)

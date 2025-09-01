@@ -6,14 +6,29 @@
 
 #define OLIVEC_IMPLEMENTATION
 #include "olive.c"
+
 #include "stb_vorbis.c"
 #define MAX_AUDIO_SOURCES 16
 #define STREAM_BUFFER_FRAMES 4096
+
+#define PERMANENT_ARENA_SIZE (64 * 1024 * 1024)
+#define TRANSIENT_ARENA_SIZE (64 * 1024 * 1024)
+
+typedef struct {
+    u8* memory;
+    usize size;
+    usize offset;
+    const char* name;
+} Arena;
 
 static struct {
     u32 display[WIDTH * HEIGHT];
     i16 audio[AUDIO_CAPACITY];
     AudioSource audio_sources[MAX_AUDIO_SOURCES];
+    Arena permanent_arena;
+    Arena transient_arena;
+    u8 permanent_memory[PERMANENT_ARENA_SIZE];
+    u8 transient_memory[TRANSIENT_ARENA_SIZE];
 } global;
 
 Game game_init(void) {
@@ -22,6 +37,20 @@ Game game_init(void) {
     debug_print("  Audio: %d Hz, %zu channels, %zu capacity\n", AUDIO_SAMPLE_RATE, AUDIO_CHANNELS, AUDIO_CAPACITY);
     debug_print("  FPS: %d\n", FPS);
     debug_print("  Max audio sources: %d\n", MAX_AUDIO_SOURCES);
+
+    // Permanent arena (for static audio, textures, etc.)
+    global.permanent_arena.memory = global.permanent_memory;
+    global.permanent_arena.size = PERMANENT_ARENA_SIZE;
+    global.permanent_arena.offset = 0;
+    global.permanent_arena.name = "Permanent";
+    debug_print("  Permanent arena: %.1f KB initialized\n", PERMANENT_ARENA_SIZE / 1024.0f);
+    
+    // Transient arena (for temporary data during processing)
+    global.transient_arena.memory = global.transient_memory;
+    global.transient_arena.size = TRANSIENT_ARENA_SIZE;
+    global.transient_arena.offset = 0;
+    global.transient_arena.name = "Transient";
+    debug_print("  Transient arena: %.1f KB initialized\n", TRANSIENT_ARENA_SIZE / 1024.0f);
     
     Game game = {
         .title              = (char*)TITLE,
@@ -42,8 +71,75 @@ Game game_init(void) {
     return game;
 };
 
+internal void* arena_alloc(Arena* arena, usize size) {
+    // Align to 8 bytes for better performance
+    usize aligned_size = (size + 7) & ~7;
+    
+    if (arena->offset + aligned_size > arena->size) {
+        debug_print("Error: %s arena out of memory (requested: %.1f KB, available: %.1f KB)\n", 
+                   arena->name, aligned_size / 1024.0f, (arena->size - arena->offset) / 1024.0f);
+        return nullptr;
+    }
+    
+    void* ptr = arena->memory + arena->offset;
+    arena->offset += aligned_size;
+    
+#if DEBUG_ARENA_ALLOCATIONS
+    debug_print("%s arena alloc: %.1f KB at offset %.1f KB (remaining: %.1f KB)\n", 
+               arena->name, aligned_size / 1024.0f, (arena->offset - aligned_size) / 1024.0f, 
+               (arena->size - arena->offset) / 1024.0f);
+#endif
+    
+    return ptr;
+}
+
+internal void arena_reset(Arena* arena) {
+#if DEBUG_ARENA_RESETS
+    debug_print("%s arena reset: freeing %.1f KB\n", arena->name, arena->offset / 1024.0f);
+#endif
+    arena->offset = 0;
+}
+
+internal usize arena_get_used(Arena* arena) {
+    return arena->offset;
+}
+
+internal usize arena_get_remaining(Arena* arena) {
+    return arena->size - arena->offset;
+}
+
+void game_reset_transient_arena(void) {
+    arena_reset(&global.transient_arena);
+}
+
+void game_reset_permanent_arena(void) {
+    arena_reset(&global.permanent_arena);
+}
+
+usize game_get_permanent_arena_usage(void) {
+    return arena_get_used(&global.permanent_arena);
+}
+
+usize game_get_transient_arena_usage(void) {
+    return arena_get_used(&global.transient_arena);
+}
+
+void game_print_arena_stats(void) {
+    debug_print("Arena statistics:\n");
+    debug_print("  Permanent: %.1f/%.1f KB used (%.1f%%, %.1f KB remaining)\n",
+               arena_get_used(&global.permanent_arena) / 1024.0f, 
+               global.permanent_arena.size / 1024.0f,
+               (float)arena_get_used(&global.permanent_arena) / global.permanent_arena.size * 100.0f,
+               arena_get_remaining(&global.permanent_arena) / 1024.0f);
+    debug_print("  Transient: %.1f/%.1f KB used (%.1f%%, %.1f KB remaining)\n",
+               arena_get_used(&global.transient_arena) / 1024.0f,
+               global.transient_arena.size / 1024.0f,
+               (float)arena_get_used(&global.transient_arena) / global.transient_arena.size * 100.0f,
+               arena_get_remaining(&global.transient_arena) / 1024.0f);
+}
+
 void game_update_and_render(Game* game) {
-    // clear the pixels
+    // Clear to black
     for (usize i = 0; i < ARRAY_LEN(global.display); i++) {
         global.display[i] = RGBA(0, 0, 0, 255);
     }
@@ -72,6 +168,9 @@ void game_update_and_render(Game* game) {
         RGBA(0, 0, 255, 255)
     );
     angle += 2 * PI * DELTA_TIME;
+
+    // Reset transient arena at the end of each frame
+    game_reset_transient_arena();
 };
 
 void game_key_up([[maybe_unused]] int key) {
@@ -82,35 +181,40 @@ void game_key_down([[maybe_unused]] int key) {
     TODO("Implement this");
 };
 
-
-// Fixed resampling function with proper ratio calculation
-internal i16* resample_audio(i16* input_samples, usize input_frames, int input_channels, 
-                          int input_rate, int target_rate, usize* output_frames) {
-    
+internal i16* resample_audio(
+    i16* input_samples,
+    usize input_frames,
+    int input_channels,
+    int input_rate,
+    int target_rate,
+    usize* output_frames
+) {
     debug_print("Resampling: %d Hz -> %d Hz, %d channels, %zu frames\n", 
         input_rate, target_rate, input_channels, input_frames);
     
     if (input_rate == target_rate) {
         *output_frames = input_frames;
         usize total_samples = input_frames * input_channels;
-        i16* output = malloc(total_samples * sizeof(i16));
+        i16* output = arena_alloc(&global.transient_arena, total_samples * sizeof(i16));
         memcpy(output, input_samples, total_samples * sizeof(i16));
         return output;
     }
     
-    // FIXED: Correct ratio calculation
     // If input is 22kHz and target is 48kHz, ratio should be 48/22 = 2.18 (upsample)
     // If input is 48kHz and target is 22kHz, ratio should be 22/48 = 0.46 (downsample)
     double ratio = (double)target_rate / (double)input_rate;
     *output_frames = (usize)(input_frames * ratio + 0.5); // Add 0.5 for rounding
     
     usize output_samples = *output_frames * input_channels;
-    i16* output = malloc(output_samples * sizeof(i16));
+    i16* output = arena_alloc(&global.transient_arena, output_samples * sizeof(i16));
+    if (!output) {
+        debug_print("Error: Transient arena out of memory for raw samples\n");
+        return nullptr;
+    }
     
     debug_print("Resampling ratio: %.3f, output frames: %zu\n", ratio, *output_frames);
     
     for (usize i = 0; i < *output_frames; i++) {
-        // FIXED: Correct source index calculation
         // For upsampling (ratio > 1): source advances slower than output
         // For downsampling (ratio < 1): source advances faster than output
         double source_index = (double)i / ratio;
@@ -181,9 +285,14 @@ AudioSource* game_load_ogg_static(Game* game, const char* filename, bool loop) {
     debug_print("  Original: %d Hz, %d channels, %zu frames\n", info.sample_rate, info.channels, total_frames);
     debug_print("  Target: %zu Hz, %zu channels\n", game->audio_sample_rate, game->audio_channels);
     
-    // Decode entire file
+    // Decode entire file into transient memory first
     usize total_input_samples = total_frames * info.channels;
-    i16* raw_samples = malloc(total_input_samples * sizeof(i16));
+    i16* raw_samples = arena_alloc(&global.transient_arena, total_input_samples * sizeof(i16));
+    if (!raw_samples) {
+        stb_vorbis_close(vorbis);
+        debug_print("Error: Transient arena out of memory for raw samples\n");
+        return nullptr;
+    }
     
     int decoded_frames = stb_vorbis_get_samples_short_interleaved(
         vorbis, info.channels, raw_samples, (int)total_input_samples);
@@ -192,7 +301,7 @@ AudioSource* game_load_ogg_static(Game* game, const char* filename, bool loop) {
     
     if (decoded_frames <= 0) {
         debug_print("Error: Failed to decode OGG file\n");
-        free(raw_samples);
+        // Note: raw_samples will be reclaimed on arena reset
         return nullptr;
     }
     
@@ -206,7 +315,7 @@ AudioSource* game_load_ogg_static(Game* game, const char* filename, bool loop) {
         resampled_audio = resample_audio(raw_samples, (usize)decoded_frames,
                                        info.channels, info.sample_rate, 
                                        (int)game->audio_sample_rate, &resampled_frames);
-        free(raw_samples);
+        // Note: raw_samples will be reclaimed on arena reset
         debug_print("  After resampling: %zu frames\n", resampled_frames);
     } else {
         resampled_audio = raw_samples;
@@ -222,17 +331,30 @@ AudioSource* game_load_ogg_static(Game* game, const char* filename, bool loop) {
         debug_print("  Converting channels: %d -> %zu\n", info.channels, game->audio_channels);
         
         usize final_samples = final_frames * game->audio_channels;
-        final_audio = malloc(final_samples * sizeof(i16));
+        final_audio = arena_alloc(&global.transient_arena, final_samples * sizeof(i16));
+        if (!final_audio) {
+            debug_print("Error: Transient arena out of memory for final audio\n");
+            return nullptr;
+        }
         
         convert_channels(resampled_audio, info.channels, 
                         final_audio, (int)game->audio_channels, final_frames);
-        
-        free(resampled_audio);
+
+        // Note: resampled_audio will be reclaimed on arena reset
         debug_print("  After channel conversion: %zu samples\n", final_samples);
     } else {
         final_audio = resampled_audio;
         debug_print("  No channel conversion needed\n");
     }
+
+    // Now copy final audio data to permanent storage
+    usize permanent_sample_count = final_frames * game->audio_channels;
+    i16* permanent_samples = arena_alloc(&global.permanent_arena, permanent_sample_count * sizeof(i16));
+    if (!permanent_samples) {
+        debug_print("Error: Permanent arena out of memory for audio data\n");
+        return nullptr;
+    }
+    memcpy(permanent_samples, final_audio, permanent_sample_count * sizeof(i16));
     
     // Find empty slot
     AudioSource* source = nullptr;
@@ -244,8 +366,8 @@ AudioSource* game_load_ogg_static(Game* game, const char* filename, bool loop) {
     }
     
     if (!source) {
+        // Note: final_audio will be reclaimed on arena reset
         debug_print("Error: No available audio source slots\n");
-        free(final_audio);
         return nullptr;
     }
     
@@ -258,7 +380,7 @@ AudioSource* game_load_ogg_static(Game* game, const char* filename, bool loop) {
     source->loop = loop;
     source->volume = 1.0f;
     
-    source->static_data.samples = final_audio;
+    source->static_data.samples = permanent_samples;
     source->static_data.sample_count = final_frames * game->audio_channels;
     source->static_data.frame_count = final_frames;
     source->static_data.current_position = 0;
@@ -267,6 +389,9 @@ AudioSource* game_load_ogg_static(Game* game, const char* filename, bool loop) {
     
     debug_print("Successfully loaded static audio: %zu frames, %d channels, %d Hz\n", 
         source->static_data.frame_count, source->channels, source->sample_rate);
+
+    // Reset transient arena to reclaim temporary processing memory
+    arena_reset(&global.transient_arena);
     
     return source;
 }
@@ -290,10 +415,12 @@ AudioSource* game_load_ogg_static_from_memory(Game* game, const u8* data, usize 
     debug_print("Loading static OGG from memory\n");
     debug_print("  Original: %d Hz, %d channels, %zu frames\n", info.sample_rate, info.channels, total_frames);
     debug_print("  Target: %zu Hz, %zu channels\n", game->audio_sample_rate, game->audio_channels);
+    debug_print("  Transient arena before loading: %.1f/%.1f KB used\n", 
+               arena_get_used(&global.transient_arena) / 1024.0f, global.transient_arena.size / 1024.0f);
 
     // Decode entire file
     usize total_input_samples = total_frames * info.channels;
-    i16* raw_samples = malloc(total_input_samples * sizeof(i16));
+    i16* raw_samples = arena_alloc(&global.transient_arena, total_input_samples * sizeof(i16));
     if (!raw_samples) {
         stb_vorbis_close(vorbis);
         debug_print("Error: Out of memory allocating raw samples\n");
@@ -306,8 +433,8 @@ AudioSource* game_load_ogg_static_from_memory(Game* game, const u8* data, usize 
     stb_vorbis_close(vorbis);
 
     if (decoded_frames <= 0) {
+        // Note: raw_samples will be reclaimed on arena reset
         debug_print("Error: Failed to decode OGG data in memory\n");
-        free(raw_samples);
         return nullptr;
     }
 
@@ -321,7 +448,11 @@ AudioSource* game_load_ogg_static_from_memory(Game* game, const u8* data, usize 
         resampled_audio = resample_audio(raw_samples, (usize)decoded_frames,
                                        info.channels, info.sample_rate,
                                        (int)game->audio_sample_rate, &resampled_frames);
-        free(raw_samples);
+        if (!resampled_audio) {
+            debug_print("Error: Resampling failed\n");
+            return nullptr;
+        }
+        // Note: raw_samples will be reclaimed on arena reset
         debug_print("  After resampling: %zu frames\n", resampled_frames);
     } else {
         resampled_audio = raw_samples;
@@ -337,21 +468,25 @@ AudioSource* game_load_ogg_static_from_memory(Game* game, const u8* data, usize 
         debug_print("  Converting channels: %d -> %zu\n", info.channels, game->audio_channels);
 
         usize final_samples = final_frames * game->audio_channels;
-        final_audio = malloc(final_samples * sizeof(i16));
+        final_audio = arena_alloc(&global.transient_arena, final_samples * sizeof(i16));
         if (!final_audio) {
-            free(resampled_audio);
-            debug_print("Error: Out of memory allocating final audio\n");
+            debug_print("Error: Transient arena out of memory for final audio\n");
             return nullptr;
         }
 
         convert_channels(resampled_audio, info.channels,
                         final_audio, (int)game->audio_channels, final_frames);
 
-        free(resampled_audio);
+        // Note: resampled_audio will be reclaimed on arena reset
         debug_print("  After channel conversion: %zu samples\n", final_samples);
     } else {
         final_audio = resampled_audio;
         debug_print("  No channel conversion needed\n");
+    }
+
+    if (!final_audio) {
+        debug_print("Error: final_audio is null - this should not happen\n");
+        return nullptr;
     }
 
     AudioSource* source = nullptr;
@@ -366,9 +501,17 @@ AudioSource* game_load_ogg_static_from_memory(Game* game, const u8* data, usize 
 
     if (!source) {
         debug_print("Error: No available audio source slots\n");
-        free(final_audio);
         return nullptr;
     }
+
+    // Now copy final audio data to permanent storage
+    usize permanent_sample_count = final_frames * game->audio_channels;
+    i16* permanent_samples = arena_alloc(&global.permanent_arena, permanent_sample_count * sizeof(i16));
+    if (!permanent_samples) {
+        debug_print("Error: Permanent arena out of memory for audio data\n");
+        return nullptr;
+    }
+    memcpy(permanent_samples, final_audio, permanent_sample_count * sizeof(i16));
 
     // Initialize static audio source - CRITICAL: Zero the entire structure first
     memset(source, 0, sizeof(AudioSource));
@@ -379,7 +522,7 @@ AudioSource* game_load_ogg_static_from_memory(Game* game, const u8* data, usize 
     source->loop = loop;
     source->volume = 1.0f;
 
-    source->static_data.samples = final_audio;
+    source->static_data.samples = permanent_samples;
     source->static_data.sample_count = final_frames * game->audio_channels;
     source->static_data.frame_count = final_frames;
     source->static_data.current_position = 0;
@@ -389,6 +532,9 @@ AudioSource* game_load_ogg_static_from_memory(Game* game, const u8* data, usize 
     debug_print("Successfully loaded static audio from memory: %zu frames, %d channels, %d Hz (slot %zu)\n",
         source->static_data.frame_count, source->channels, source->sample_rate, 
         (usize)(source - game->loaded_audio));
+
+    // Reset transient arena to reclaim temporary processing memory
+    arena_reset(&global.transient_arena);
 
     return source;
 }
@@ -433,10 +579,18 @@ AudioSource* game_load_ogg_streaming(Game* game, const char* filename, bool loop
     source->volume = 1.0f;
     
     source->stream_data.vorbis = vorbis;
-    source->stream_data.filename = malloc(strlen(filename) + 1);
+    source->stream_data.filename = arena_alloc(&global.permanent_arena, strlen(filename) + 1);
+    if (!source->stream_data.filename) {
+        stb_vorbis_close(vorbis);
+        return nullptr;
+    }
     strcpy(source->stream_data.filename, filename);
     source->stream_data.buffer_frames = STREAM_BUFFER_FRAMES;
-    source->stream_data.stream_buffer = malloc(STREAM_BUFFER_FRAMES * info.channels * sizeof(i16));
+    source->stream_data.stream_buffer = arena_alloc(&global.permanent_arena, STREAM_BUFFER_FRAMES * info.channels * sizeof(i16));
+    if (!source->stream_data.stream_buffer) {
+        stb_vorbis_close(vorbis);
+        return nullptr;
+    }
     source->stream_data.buffer_position = 0;
     source->stream_data.buffer_valid = 0;
     source->stream_data.end_of_file = false;
@@ -610,13 +764,15 @@ void game_free_audio_source(AudioSource* source) {
     source->is_playing = false;
     
     if (source->type == AUDIO_SOURCE_STATIC) {
-        free(source->static_data.samples);
+        // Note: Arena-allocated memory doesn't need explicit freeing
+        source->static_data.samples = nullptr;
     } else if (source->type == AUDIO_SOURCE_STREAMING) {
         if (source->stream_data.vorbis) {
             stb_vorbis_close(source->stream_data.vorbis);
         }
-        free(source->stream_data.filename);
-        free(source->stream_data.stream_buffer);
+        // Note: Arena-allocated memory doesn't need explicit freeing
+        source->stream_data.filename = nullptr;
+        source->stream_data.stream_buffer = nullptr;
     }
     
     memset(source, 0, sizeof(AudioSource));
