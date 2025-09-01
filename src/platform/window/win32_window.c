@@ -31,7 +31,7 @@ static struct {
  */
 struct {
     BITMAPINFOHEADER header;
-    DWORD masks[4]; // R, G, B, A masks for BI_BITFIELDS
+    DWORD masks[4];
 } g_custom_bitmap_info;
 
 /**
@@ -115,15 +115,20 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 }
 
 static HBITMAP create_dib_section(HDC hdc, int width, int height, void** pixel_data) {
-    BITMAPINFO bmi = {};
-    bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    bmi.bmiHeader.biWidth = width;
-    bmi.bmiHeader.biHeight = -height;
-    bmi.bmiHeader.biPlanes = 1;
-    bmi.bmiHeader.biBitCount = 32;
-    bmi.bmiHeader.biCompression = BI_RGB;
+    g_custom_bitmap_info.header.biSize = sizeof(BITMAPINFOHEADER);
+    g_custom_bitmap_info.header.biWidth = width;
+    g_custom_bitmap_info.header.biHeight = -height;
+    g_custom_bitmap_info.header.biPlanes = 1;
+    g_custom_bitmap_info.header.biBitCount = 32;
+    g_custom_bitmap_info.header.biCompression = BI_BITFIELDS;
+    g_custom_bitmap_info.header.biSizeImage = 0;
+    
+    g_custom_bitmap_info.masks[0] = 0x000000FF; // Red mask
+    g_custom_bitmap_info.masks[1] = 0x0000FF00; // Green mask  
+    g_custom_bitmap_info.masks[2] = 0x00FF0000; // Blue mask
+    g_custom_bitmap_info.masks[3] = 0xFF000000; // Alpha mask
 
-    return CreateDIBSection(hdc, &bmi, DIB_RGB_COLORS, pixel_data, nullptr, 0);
+    return CreateDIBSection(hdc, (BITMAPINFO*)&g_custom_bitmap_info, DIB_RGB_COLORS, pixel_data, nullptr, 0);
 }
 
 static void setup_double_buffering() {
