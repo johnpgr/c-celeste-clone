@@ -3,6 +3,7 @@
 #include "window.h"
 #include "audio.h"
 #include "utils.h"
+#include "ogg.h"
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
     Game game = game_init();
@@ -10,18 +11,12 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
     window_init(&game);
     audio_init(&game);
 
-    defer { 
-        free_all_audio_sources();
-        audio_cleanup();
-        window_cleanup();
-    };
-
     constexpr u8 randomize_audio[] = {
         #embed "assets/Randomize.ogg"
     };
     constexpr usize randomize_audio_size = sizeof(randomize_audio);
 
-    AudioSource* randomize_ogg = game_load_ogg_static_from_memory(
+    AudioSource* randomize_ogg = load_ogg_static_from_memory(
         &game,
         randomize_audio,
         randomize_audio_size,
@@ -34,7 +29,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
     };
     constexpr usize test_audio_size = sizeof(test_audio);
 
-    AudioSource* test_ogg = game_load_ogg_static_from_memory(
+    AudioSource* test_ogg = load_ogg_static_from_memory(
         &game,
         test_audio,
         test_audio_size,
@@ -97,6 +92,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
             }
         }
     }
+
+    game_cleanup(&game);
+    audio_cleanup();
+    window_cleanup();
 
     return EXIT_SUCCESS;
 }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <assert.h>
 #include <stdint.h>
 #include <stddef.h>
 
@@ -27,9 +28,18 @@
 
 #define PI 3.14159265358979323846
 
+#define KB(number) ((number) * 1024ull)
+#define MB(number) (KB(number) * 1024ull)
+#define GB(number) (MB(number) * 1024ull)
+#define TB(number) (GB(number) * 1024ull)
 #define ARRAY_LEN(arr) (sizeof(arr) / sizeof((arr)[0]))
 #define RGBA(r, g, b, a) ((((r)&0xFF)<<(8*0)) | (((g)&0xFF)<<(8*1)) | (((b)&0xFF)<<(8*2)) | (((a)&0xFF)<<(8*3)))
 #define CLAMP(val, lo, hi) ((val) < (lo) ? (lo) : ((val) > (hi) ? (hi) : (val)))
+
+inline u32 trunc_u64(u64 val) {
+    assert(val <= 0xFFFFFFFF && "u64 value bigger than max possible u32");
+    return (u32)val;
+}
 
 extern void debug_print(const char* format, ...);
 
@@ -37,8 +47,3 @@ extern void debug_print(const char* format, ...);
     debug_print("%s:%d:%d [TODO][%s()] %s\n", __FILE__, __LINE__, 1, __func__, msg); \
     abort(); \
 } while(0)
-
-static inline void defer_cleanup(void (^*b)(void)) { (*b)(); }
-#define defer_merge(a,b) a##b
-#define defer_varname(a) defer_merge(defer_scopevar_, a)
-#define defer __attribute__((cleanup(defer_cleanup))) void (^defer_varname(__COUNTER__))(void) =^
