@@ -2,6 +2,8 @@
 
 #include "game.h"
 
+#define NUM_BUFFERS 3
+
 /**
  * @brief Initializes the audio system.
  * @param game A pointer to the game instance.

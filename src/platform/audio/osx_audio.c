@@ -15,7 +15,7 @@ typedef struct {
 internal struct {
     Game* game;
     AudioQueueRef queue;
-    AudioQueueBufferRef buffers[AUDIO_CHANNELS];
+    AudioQueueBufferRef buffers[NUM_BUFFERS];
     RingBuffer ring_buffer;
     bool initialized;
 } global_audio_state;
@@ -140,7 +140,7 @@ void audio_init(Game* game) {
     }
 
     u32 buffer_size = game->audio_channels * (game->audio_sample_rate / game->fps) * sizeof(i16);
-    for (int i = 0; i < AUDIO_CHANNELS; i++) {
+    for (int i = 0; i < NUM_BUFFERS; i++) {
         status = AudioQueueAllocateBuffer(global_audio_state.queue, buffer_size, &global_audio_state.buffers[i]);
         if (status == noErr) {
             memset(global_audio_state.buffers[i]->mAudioData, 0, buffer_size);
