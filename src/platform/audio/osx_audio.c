@@ -27,13 +27,13 @@ internal void ring_buffer_init(RingBuffer* rb, usize capacity) {
     rb->write_pos = 0;
     rb->read_pos = 0;
     rb->available = 0;
-    pthread_mutex_init(&rb->mutex, NULL);
+    pthread_mutex_init(&rb->mutex, nullptr);
 }
 
 internal void ring_buffer_destroy(RingBuffer* rb) {
     pthread_mutex_destroy(&rb->mutex);
     free(rb->data);
-    rb->data = NULL;
+    rb->data = nullptr;
 }
 
 internal usize ring_buffer_write(RingBuffer* rb, const i16* data, usize samples) {
@@ -74,7 +74,7 @@ internal void audio_callback(void* user_data, AudioQueueRef aq, AudioQueueBuffer
     if (!game || !global_audio_state.initialized) {
         memset(buffer->mAudioData, 0, buffer->mAudioDataBytesCapacity);
         buffer->mAudioDataByteSize = buffer->mAudioDataBytesCapacity;
-        AudioQueueEnqueueBuffer(aq, buffer, 0, NULL);
+        AudioQueueEnqueueBuffer(aq, buffer, 0, nullptr);
         return;
     }
 
@@ -102,7 +102,7 @@ internal void audio_callback(void* user_data, AudioQueueRef aq, AudioQueueBuffer
     }
 
     buffer->mAudioDataByteSize = buffer_size;
-    AudioQueueEnqueueBuffer(aq, buffer, 0, NULL);
+    AudioQueueEnqueueBuffer(aq, buffer, 0, nullptr);
 }
 
 void audio_init(Game* game) {
@@ -128,8 +128,8 @@ void audio_init(Game* game) {
         &format,
         audio_callback,
         game,
-        NULL,
-        NULL,
+        nullptr,
+        nullptr,
         0,
         &global_audio_state.queue
     );
@@ -145,14 +145,14 @@ void audio_init(Game* game) {
         if (status == noErr) {
             memset(global_audio_state.buffers[i]->mAudioData, 0, buffer_size);
             global_audio_state.buffers[i]->mAudioDataByteSize = buffer_size;
-            AudioQueueEnqueueBuffer(global_audio_state.queue, global_audio_state.buffers[i], 0, NULL);
+            AudioQueueEnqueueBuffer(global_audio_state.queue, global_audio_state.buffers[i], 0, nullptr);
         } else {
             debug_print("Error: Could not allocate audio buffer %d (status: %d)\n", i, (int)status);
             return;
         }
     }
 
-    status = AudioQueueStart(global_audio_state.queue, NULL);
+    status = AudioQueueStart(global_audio_state.queue, nullptr);
     if (status != noErr) {
         debug_print("Error: Could not start audio queue (status: %d)\n", (int)status);
         return;
@@ -188,9 +188,11 @@ void audio_cleanup(void) {
     if (global_audio_state.queue) {
         AudioQueueStop(global_audio_state.queue, true);
         AudioQueueDispose(global_audio_state.queue, true);
-        global_audio_state.queue = NULL;
+        global_audio_state.queue = nullptr;
     }
     
     ring_buffer_destroy(&global_audio_state.ring_buffer);
     global_audio_state.initialized = false;
+
+    debug_print("CoreAudio audio system cleaned up\n");
 }

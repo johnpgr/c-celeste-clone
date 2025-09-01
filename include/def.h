@@ -31,9 +31,14 @@
 #define RGBA(r, g, b, a) ((((r)&0xFF)<<(8*0)) | (((g)&0xFF)<<(8*1)) | (((b)&0xFF)<<(8*2)) | (((a)&0xFF)<<(8*3)))
 #define CLAMP(val, lo, hi) ((val) < (lo) ? (lo) : ((val) > (hi) ? (hi) : (val)))
 
+extern void debug_print(const char* format, ...);
+
 #define TODO(msg) do { \
     debug_print("%s:%d:%d [TODO][%s()] %s\n", __FILE__, __LINE__, 1, __func__, msg); \
     abort(); \
 } while(0)
 
-extern void debug_print(const char* format, ...);
+static inline void defer_cleanup(void (^*b)(void)) { (*b)(); }
+#define defer_merge(a,b) a##b
+#define defer_varname(a) defer_merge(defer_scopevar_, a)
+#define defer __attribute__((cleanup(defer_cleanup))) void (^defer_varname(__COUNTER__))(void) =^

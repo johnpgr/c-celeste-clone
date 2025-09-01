@@ -10,22 +10,41 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
     window_init(&game);
     audio_init(&game);
 
+    defer { 
+        free_all_audio_sources();
+        audio_cleanup();
+        window_cleanup();
+    };
+
     constexpr u8 randomize_audio[] = {
         #embed "assets/Randomize.ogg"
     };
     constexpr usize randomize_audio_size = sizeof(randomize_audio);
-    AudioSource* randomize_ogg = game_load_ogg_static_from_memory(&game, randomize_audio, randomize_audio_size, false);
+
+    AudioSource* randomize_ogg = game_load_ogg_static_from_memory(
+        &game,
+        randomize_audio,
+        randomize_audio_size,
+        false
+    );
     randomize_ogg->volume = 0.3f;
 
     constexpr u8 test_audio[] = {
         #embed "assets/test.ogg"
     };
     constexpr usize test_audio_size = sizeof(test_audio);
-    AudioSource* test_ogg = game_load_ogg_static_from_memory(&game, test_audio, test_audio_size, false);
+
+    AudioSource* test_ogg = game_load_ogg_static_from_memory(
+        &game,
+        test_audio,
+        test_audio_size,
+        false
+    );
     if (!test_ogg) {
         debug_print("ERROR: Failed to load test_ogg\n");
         return -1;
     }
+
     test_ogg->volume = 0.5f;
     game_play_audio_source(test_ogg);
 
@@ -35,6 +54,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
     u64 last_time = current_time_nanos();
     u64 fps_timer_start = current_time_nanos();
     
+
+    // TODO: Separate render thread from main thread 
+    // (for resizing, moving the window without stopping the render)
+    // Audio thread is already separate
     while (!window_should_close()) {
         u64 current_time = current_time_nanos();
         u64 delta_time = current_time - last_time;
@@ -75,11 +98,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
         }
     }
 
-    for (usize i = 0; i < game.max_audio_sources; i++) {
-        game_free_audio_source(&game.loaded_audio[i]);
-    }
-    audio_cleanup();
-    window_cleanup();
     return EXIT_SUCCESS;
 }
 

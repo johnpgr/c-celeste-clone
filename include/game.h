@@ -92,3 +92,5 @@ void game_reset_permanent_arena(void);
 usize game_get_permanent_arena_usage(void);
 usize game_get_transient_arena_usage(void);
 void game_print_arena_stats(void);
+
+void free_all_audio_sources();

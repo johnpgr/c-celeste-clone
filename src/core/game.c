@@ -277,6 +277,10 @@ AudioSource* game_load_ogg_static(Game* game, const char* filename, bool loop) {
         debug_print("Error: Could not open OGG file '%s' (error: %d)\n", filename, error);
         return nullptr;
     }
+
+    defer {
+        stb_vorbis_close(vorbis);
+    };
     
     stb_vorbis_info info = stb_vorbis_get_info(vorbis);
     usize total_frames = stb_vorbis_stream_length_in_samples(vorbis);
@@ -289,15 +293,12 @@ AudioSource* game_load_ogg_static(Game* game, const char* filename, bool loop) {
     usize total_input_samples = total_frames * info.channels;
     i16* raw_samples = arena_alloc(&global.transient_arena, total_input_samples * sizeof(i16));
     if (!raw_samples) {
-        stb_vorbis_close(vorbis);
         debug_print("Error: Transient arena out of memory for raw samples\n");
         return nullptr;
     }
     
     int decoded_frames = stb_vorbis_get_samples_short_interleaved(
         vorbis, info.channels, raw_samples, (int)total_input_samples);
-    
-    stb_vorbis_close(vorbis);
     
     if (decoded_frames <= 0) {
         debug_print("Error: Failed to decode OGG file\n");
@@ -409,6 +410,10 @@ AudioSource* game_load_ogg_static_from_memory(Game* game, const u8* data, usize 
         return nullptr;
     }
 
+    defer { 
+        stb_vorbis_close(vorbis); 
+    };
+
     stb_vorbis_info info = stb_vorbis_get_info(vorbis);
     usize total_frames = stb_vorbis_stream_length_in_samples(vorbis);
 
@@ -422,15 +427,12 @@ AudioSource* game_load_ogg_static_from_memory(Game* game, const u8* data, usize 
     usize total_input_samples = total_frames * info.channels;
     i16* raw_samples = arena_alloc(&global.transient_arena, total_input_samples * sizeof(i16));
     if (!raw_samples) {
-        stb_vorbis_close(vorbis);
         debug_print("Error: Out of memory allocating raw samples\n");
         return nullptr;
     }
 
     int decoded_frames = stb_vorbis_get_samples_short_interleaved(
         vorbis, info.channels, raw_samples, (int)total_input_samples);
-
-    stb_vorbis_close(vorbis);
 
     if (decoded_frames <= 0) {
         // Note: raw_samples will be reclaimed on arena reset
@@ -551,6 +553,10 @@ AudioSource* game_load_ogg_streaming(Game* game, const char* filename, bool loop
         debug_print("Error: Could not open OGG file '%s' for streaming\n", filename);
         return nullptr;
     }
+
+    defer {
+        stb_vorbis_close(vorbis);
+    };
     
     stb_vorbis_info info = stb_vorbis_get_info(vorbis);
     
@@ -566,9 +572,11 @@ AudioSource* game_load_ogg_streaming(Game* game, const char* filename, bool loop
     }
     
     if (!source) {
-        stb_vorbis_close(vorbis);
+        debug_print("Error: No available audio source slots\n");
         return nullptr;
     }
+
+    memset(source, 0, sizeof(AudioSource));
     
     // Initialize streaming source
     source->type = AUDIO_SOURCE_STREAMING;
@@ -581,16 +589,21 @@ AudioSource* game_load_ogg_streaming(Game* game, const char* filename, bool loop
     source->stream_data.vorbis = vorbis;
     source->stream_data.filename = arena_alloc(&global.permanent_arena, strlen(filename) + 1);
     if (!source->stream_data.filename) {
-        stb_vorbis_close(vorbis);
+        debug_print("Error: Failed to allocate filename for streaming ogg\n");
         return nullptr;
     }
+
     strcpy(source->stream_data.filename, filename);
     source->stream_data.buffer_frames = STREAM_BUFFER_FRAMES;
-    source->stream_data.stream_buffer = arena_alloc(&global.permanent_arena, STREAM_BUFFER_FRAMES * info.channels * sizeof(i16));
+    source->stream_data.stream_buffer = arena_alloc(
+        &global.permanent_arena,
+        STREAM_BUFFER_FRAMES * info.channels * sizeof(i16)
+    );
     if (!source->stream_data.stream_buffer) {
-        stb_vorbis_close(vorbis);
+        debug_print("Error: Failed to allocate stream_buffer for streaming ogg\n");
         return nullptr;
     }
+
     source->stream_data.buffer_position = 0;
     source->stream_data.buffer_valid = 0;
     source->stream_data.end_of_file = false;
@@ -776,4 +789,10 @@ void game_free_audio_source(AudioSource* source) {
     }
     
     memset(source, 0, sizeof(AudioSource));
+}
+
+void free_all_audio_sources() {
+    for (usize i = 0; i < MAX_AUDIO_SOURCES; i++) {
+        game_free_audio_source(&global.audio_sources[i]);
+    }
 }

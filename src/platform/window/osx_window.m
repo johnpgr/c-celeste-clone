@@ -1,6 +1,7 @@
 #import <Cocoa/Cocoa.h>
 #include "game.h"
 #include "window.h"
+#undef defer
 
 /**
  * @file window.m
