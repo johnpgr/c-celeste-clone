@@ -15,7 +15,7 @@
 inline void debug_print(const char* format, ...) {
     const int buffer_size = 1024;
     char buffer[buffer_size];
-    
+
     va_list args;
     va_start(args, format);
 
@@ -23,7 +23,11 @@ inline void debug_print(const char* format, ...) {
 
     va_end(args);
 #ifdef _WIN32
-    OutputDebugStringA(buffer);
+    if (IsDebuggerPresent()) {
+        OutputDebugStringA(buffer);
+    } else {
+        fprintf(stderr, "%s", buffer);
+    }
 #else
     fprintf(stderr, "%s", buffer);
 #endif
