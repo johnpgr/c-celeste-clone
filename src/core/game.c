@@ -1,3 +1,4 @@
+#define _CRT_SECURE_NO_WARNINGS
 #include <math.h>
 #include <string.h>
 #include "def.h"
@@ -192,7 +193,7 @@ AudioSource* game_load_ogg_static(Game* game, const char* filename, bool loop) {
     i16* resampled_audio = NULL;
     usize resampled_frames = 0;
     
-    if (info.sample_rate != (int)game->audio_sample_rate) {
+    if (info.sample_rate != (usize)game->audio_sample_rate) {
         resampled_audio = resample_audio(raw_samples, (usize)decoded_frames,
                                        info.channels, info.sample_rate, 
                                        (int)game->audio_sample_rate, &resampled_frames);
@@ -307,7 +308,7 @@ AudioSource* game_load_ogg_static_from_memory(Game* game, const u8* data, usize 
     i16* resampled_audio = NULL;
     usize resampled_frames = 0;
 
-    if (info.sample_rate != (int)game->audio_sample_rate) {
+    if (info.sample_rate != (usize)game->audio_sample_rate) {
         resampled_audio = resample_audio(raw_samples, (usize)decoded_frames,
                                        info.channels, info.sample_rate,
                                        (int)game->audio_sample_rate, &resampled_frames);
