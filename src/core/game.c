@@ -17,7 +17,13 @@ static struct {
 } global;
 
 Game game_init(void) {
-    return (Game) {
+    debug_print("Initializing game...\n");
+    debug_print("  Display: %dx%d pixels\n", WIDTH, HEIGHT);
+    debug_print("  Audio: %d Hz, %zu channels, %zu capacity\n", AUDIO_SAMPLE_RATE, AUDIO_CHANNELS, AUDIO_CAPACITY);
+    debug_print("  FPS: %d\n", FPS);
+    debug_print("  Max audio sources: %d\n", MAX_AUDIO_SOURCES);
+    
+    Game game = {
         .title              = (char*)TITLE,
         .fps                = FPS,
         .display            = global.display,
@@ -31,6 +37,9 @@ Game game_init(void) {
         .max_audio_sources  = MAX_AUDIO_SOURCES,
         .active_audio_count = 0,
     };
+    
+    debug_print("Game initialized successfully\n");
+    return game;
 };
 
 void game_update_and_render(Game* game) {
@@ -155,14 +164,14 @@ internal void convert_channels(i16* input, int input_channels, i16* output, int 
 AudioSource* game_load_ogg_static(Game* game, const char* filename, bool loop) {
     if (game->active_audio_count >= game->max_audio_sources) {
         debug_print("Error: Maximum audio sources reached\n");
-        return NULL;
+        return nullptr;
     }
     
     int error = 0;
-    stb_vorbis* vorbis = stb_vorbis_open_filename(filename, &error, NULL);
+    stb_vorbis* vorbis = stb_vorbis_open_filename(filename, &error, nullptr);
     if (!vorbis) {
         debug_print("Error: Could not open OGG file '%s' (error: %d)\n", filename, error);
-        return NULL;
+        return nullptr;
     }
     
     stb_vorbis_info info = stb_vorbis_get_info(vorbis);
@@ -184,13 +193,13 @@ AudioSource* game_load_ogg_static(Game* game, const char* filename, bool loop) {
     if (decoded_frames <= 0) {
         debug_print("Error: Failed to decode OGG file\n");
         free(raw_samples);
-        return NULL;
+        return nullptr;
     }
     
     debug_print("  Decoded %d frames successfully\n", decoded_frames);
     
     // Step 1: Handle sample rate conversion
-    i16* resampled_audio = NULL;
+    i16* resampled_audio = nullptr;
     usize resampled_frames = 0;
     
     if (info.sample_rate != (usize)game->audio_sample_rate) {
@@ -206,7 +215,7 @@ AudioSource* game_load_ogg_static(Game* game, const char* filename, bool loop) {
     }
     
     // Step 2: Handle channel conversion
-    i16* final_audio = NULL;
+    i16* final_audio = nullptr;
     usize final_frames = resampled_frames;
     
     if (info.channels != (int)game->audio_channels) {
@@ -226,9 +235,9 @@ AudioSource* game_load_ogg_static(Game* game, const char* filename, bool loop) {
     }
     
     // Find empty slot
-    AudioSource* source = NULL;
+    AudioSource* source = nullptr;
     for (usize i = 0; i < game->max_audio_sources; i++) {
-        if (game->loaded_audio[i].type == 0) {
+        if (game->loaded_audio[i].type == AUDIO_SOURCE_NONE) {
             source = &game->loaded_audio[i];
             break;
         }
@@ -237,7 +246,7 @@ AudioSource* game_load_ogg_static(Game* game, const char* filename, bool loop) {
     if (!source) {
         debug_print("Error: No available audio source slots\n");
         free(final_audio);
-        return NULL;
+        return nullptr;
     }
     
     // Initialize static audio source
@@ -265,14 +274,14 @@ AudioSource* game_load_ogg_static(Game* game, const char* filename, bool loop) {
 AudioSource* game_load_ogg_static_from_memory(Game* game, const u8* data, usize data_size, bool loop) {
     if (game->active_audio_count >= game->max_audio_sources) {
         debug_print("Error: Maximum audio sources reached\n");
-        return NULL;
+        return nullptr;
     }
 
     int error = 0;
-    stb_vorbis* vorbis = stb_vorbis_open_memory((const unsigned char*)data, (int)data_size, &error, NULL);
+    stb_vorbis* vorbis = stb_vorbis_open_memory((const unsigned char*)data, (int)data_size, &error, nullptr);
     if (!vorbis) {
         debug_print("Error: Could not open OGG data in memory (error: %d)\n", error);
-        return NULL;
+        return nullptr;
     }
 
     stb_vorbis_info info = stb_vorbis_get_info(vorbis);
@@ -288,7 +297,7 @@ AudioSource* game_load_ogg_static_from_memory(Game* game, const u8* data, usize 
     if (!raw_samples) {
         stb_vorbis_close(vorbis);
         debug_print("Error: Out of memory allocating raw samples\n");
-        return NULL;
+        return nullptr;
     }
 
     int decoded_frames = stb_vorbis_get_samples_short_interleaved(
@@ -299,13 +308,13 @@ AudioSource* game_load_ogg_static_from_memory(Game* game, const u8* data, usize 
     if (decoded_frames <= 0) {
         debug_print("Error: Failed to decode OGG data in memory\n");
         free(raw_samples);
-        return NULL;
+        return nullptr;
     }
 
     debug_print("  Decoded %d frames successfully\n", decoded_frames);
 
     // Step 1: Handle sample rate conversion
-    i16* resampled_audio = NULL;
+    i16* resampled_audio = nullptr;
     usize resampled_frames = 0;
 
     if (info.sample_rate != (usize)game->audio_sample_rate) {
@@ -321,7 +330,7 @@ AudioSource* game_load_ogg_static_from_memory(Game* game, const u8* data, usize 
     }
 
     // Step 2: Handle channel conversion
-    i16* final_audio = NULL;
+    i16* final_audio = nullptr;
     usize final_frames = resampled_frames;
 
     if (info.channels != (int)game->audio_channels) {
@@ -332,7 +341,7 @@ AudioSource* game_load_ogg_static_from_memory(Game* game, const u8* data, usize 
         if (!final_audio) {
             free(resampled_audio);
             debug_print("Error: Out of memory allocating final audio\n");
-            return NULL;
+            return nullptr;
         }
 
         convert_channels(resampled_audio, info.channels,
@@ -345,11 +354,12 @@ AudioSource* game_load_ogg_static_from_memory(Game* game, const u8* data, usize 
         debug_print("  No channel conversion needed\n");
     }
 
-    // Find empty slot
-    AudioSource* source = NULL;
+    AudioSource* source = nullptr;
     for (usize i = 0; i < game->max_audio_sources; i++) {
-        if (game->loaded_audio[i].type == 0) {
+        debug_print("  Checking slot %zu: type=%d\n", i, game->loaded_audio[i].type);
+        if (game->loaded_audio[i].type == AUDIO_SOURCE_NONE) {
             source = &game->loaded_audio[i];
+            debug_print("  Using slot %zu\n", i);
             break;
         }
     }
@@ -357,10 +367,10 @@ AudioSource* game_load_ogg_static_from_memory(Game* game, const u8* data, usize 
     if (!source) {
         debug_print("Error: No available audio source slots\n");
         free(final_audio);
-        return NULL;
+        return nullptr;
     }
 
-    // Initialize static audio source
+    // Initialize static audio source - CRITICAL: Zero the entire structure first
     memset(source, 0, sizeof(AudioSource));
     source->type = AUDIO_SOURCE_STATIC;
     source->channels = (int)game->audio_channels;
@@ -376,8 +386,9 @@ AudioSource* game_load_ogg_static_from_memory(Game* game, const u8* data, usize 
 
     game->active_audio_count++;
 
-    debug_print("Successfully loaded static audio from memory: %zu frames, %d channels, %d Hz\n",
-        source->static_data.frame_count, source->channels, source->sample_rate);
+    debug_print("Successfully loaded static audio from memory: %zu frames, %d channels, %d Hz (slot %zu)\n",
+        source->static_data.frame_count, source->channels, source->sample_rate, 
+        (usize)(source - game->loaded_audio));
 
     return source;
 }
@@ -385,14 +396,14 @@ AudioSource* game_load_ogg_static_from_memory(Game* game, const u8* data, usize 
 AudioSource* game_load_ogg_streaming(Game* game, const char* filename, bool loop) {
     if (game->active_audio_count >= game->max_audio_sources) {
         debug_print("Error: Maximum audio sources reached\n");
-        return NULL;
+        return nullptr;
     }
     
     int error = 0;
-    stb_vorbis* vorbis = stb_vorbis_open_filename(filename, &error, NULL);
+    stb_vorbis* vorbis = stb_vorbis_open_filename(filename, &error, nullptr);
     if (!vorbis) {
         debug_print("Error: Could not open OGG file '%s' for streaming\n", filename);
-        return NULL;
+        return nullptr;
     }
     
     stb_vorbis_info info = stb_vorbis_get_info(vorbis);
@@ -400,9 +411,9 @@ AudioSource* game_load_ogg_streaming(Game* game, const char* filename, bool loop
     debug_print("Loading streaming OGG: %s (%d Hz, %d channels)\n", filename, info.sample_rate, info.channels);
     
     // Find empty slot
-    AudioSource* source = NULL;
+    AudioSource* source = nullptr;
     for (usize i = 0; i < game->max_audio_sources; i++) {
-        if (game->loaded_audio[i].type == 0 && !game->loaded_audio[i].stream_data.vorbis) {
+        if (game->loaded_audio[i].type == AUDIO_SOURCE_NONE && !game->loaded_audio[i].stream_data.vorbis) {
             source = &game->loaded_audio[i];
             break;
         }
@@ -410,7 +421,7 @@ AudioSource* game_load_ogg_streaming(Game* game, const char* filename, bool loop
     
     if (!source) {
         stb_vorbis_close(vorbis);
-        return NULL;
+        return nullptr;
     }
     
     // Initialize streaming source

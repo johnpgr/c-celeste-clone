@@ -127,6 +127,7 @@ static HBITMAP create_dib_section(HDC hdc, int width, int height, void** pixel_d
 }
 
 static void setup_double_buffering() {
+    debug_print("  Setting up double buffering...\n");
     g_window_state.mem_dc = CreateCompatibleDC(g_window_state.hdc);
     g_window_state.dib_bitmap = create_dib_section(
         g_window_state.hdc,
@@ -135,12 +136,17 @@ static void setup_double_buffering() {
         &g_window_state.dib_pixels
     );
     g_window_state.old_bitmap = SelectObject(g_window_state.mem_dc, g_window_state.dib_bitmap);
+    debug_print("  DIB section created: %dx%d\n", g_window_state.game->display_width, g_window_state.game->display_height);
 }
 
 /**
  * @brief Initialize the window system with a game instance
  */
 void window_init(Game* game) {
+    debug_print("Initializing window system...\n");
+    debug_print("  Title: %s\n", game->title);
+    debug_print("  Display size: %dx%d\n", game->display_width, game->display_height);
+    
     g_window_state.game = game;
 
     // Get the current instance handle
@@ -159,11 +165,14 @@ void window_init(Game* game) {
         debug_print("Error: Failed to register window class\n");
         return;
     }
+    debug_print("  Window class registered successfully\n");
 
     // Create the window
     DWORD dwStyle = WS_OVERLAPPEDWINDOW;
     RECT rect = { 0, 0, g_window_state.game->display_width, g_window_state.game->display_height };
     AdjustWindowRect(&rect, dwStyle, FALSE);
+    
+    debug_print("  Adjusted window size: %dx%d\n", rect.right - rect.left, rect.bottom - rect.top);
 
     g_window_state.h_wnd = CreateWindowEx(
         0,
@@ -183,16 +192,21 @@ void window_init(Game* game) {
         debug_print("Error: Failed to create window\n");
         return;
     }
-
-    SetStretchBltMode(g_window_state.hdc, HALFTONE); // Better quality scaling
-    setup_double_buffering();
+    debug_print("  Window created successfully\n");
 
     // Get a device context for the window
     g_window_state.hdc = GetDC(g_window_state.h_wnd);
+    SetStretchBltMode(g_window_state.hdc, HALFTONE); // Better quality scaling
+    debug_print("  Device context obtained\n");
+    
+    setup_double_buffering();
+    debug_print("  Double buffering setup complete\n");
 
     // Show window
     ShowWindow(g_window_state.h_wnd, SW_SHOWDEFAULT);
     UpdateWindow(g_window_state.h_wnd);
+    
+    debug_print("Window system initialized successfully\n");
 }
 
 /**
@@ -218,18 +232,23 @@ void window_present(void) {
  * @brief Clean up window resources
  */
 void window_cleanup(void) {
+    debug_print("Cleaning up window system...\n");
     if (g_window_state.hdc) {
         ReleaseDC(g_window_state.h_wnd, g_window_state.hdc);
         g_window_state.hdc = nullptr;
+        debug_print("  Device context released\n");
     }
     if (g_window_state.dib_bitmap) {
         DeleteObject(g_window_state.dib_bitmap);
         g_window_state.dib_bitmap = nullptr;
+        debug_print("  DIB bitmap deleted\n");
     }
     if (g_window_state.h_wnd) {
         DestroyWindow(g_window_state.h_wnd);
         g_window_state.h_wnd = nullptr;
+        debug_print("  Window destroyed\n");
     }
+    debug_print("Window system cleaned up\n");
 }
 
 /**

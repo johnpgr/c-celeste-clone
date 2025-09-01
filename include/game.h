@@ -17,8 +17,9 @@ static_assert(AUDIO_SAMPLE_RATE % FPS == 0);
 typedef struct stb_vorbis stb_vorbis;
 
 typedef enum {
-    AUDIO_SOURCE_STATIC,    // Fully loaded in memory
-    AUDIO_SOURCE_STREAMING  // Streamed from file
+    AUDIO_SOURCE_NONE      = 0,  // Uninitialized/empty slot
+    AUDIO_SOURCE_STATIC    = 1,  // Fully loaded in memory
+    AUDIO_SOURCE_STREAMING = 2,  // Streamed from file
 } AudioSourceType;
 
 typedef struct {

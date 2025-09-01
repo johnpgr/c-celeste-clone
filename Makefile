@@ -30,7 +30,7 @@ else ifeq ($(PLATFORM), win32)
     CC := clang
     CFLAGS := -std=c23 -g -Wall -Wextra -Wno-unused-variable -Wno-unused-function
     LDLIBS := -lgdi32 -luser32 -lkernel32 -ldsound
-    LDFLAGS := -Wl,/SUBSYSTEM:WINDOWS
+    # LDFLAGS := -Wl,/SUBSYSTEM:WINDOWS
     TARGET_SUFFIX := .exe
 endif
 
