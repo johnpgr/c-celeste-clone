@@ -1,9 +1,9 @@
-SRC_DIR := src
 INCLUDE_DIR := include
-EXTERNAL_DIR := $(SRC_DIR)/external
+EXTERNAL_DIR := external
+ASSETS_DIR := assets
 BUILD_DIR := build
-PLATFORM_DIR := $(SRC_DIR)/platform
-MAIN := $(SRC_DIR)/main.c
+PLATFORM_DIR := platform
+MAIN := core/main.c
 
 # Detect platform
 UNAME_S := $(shell uname -s)
@@ -20,28 +20,28 @@ endif
 # Compiler settings based on platform
 ifeq ($(PLATFORM), osx)
     CC := clang
-    CFLAGS := -std=c23 -g -Wall -Wextra -Wno-unused-variable -Wno-unused-function
+    CFLAGS := -std=c23 -g -O3 -march=native -Wall -Wextra -Wno-unused-variable -Wno-unused-function
     LDLIBS := -framework Cocoa -framework AudioToolbox
 else ifeq ($(PLATFORM), linux)
     CC := clang
-    CFLAGS := -std=c23 -g -Wall -Wextra -Wno-unused-variable -Wno-unused-function
+    CFLAGS := -std=c23 -g -O3 -march=native -Wall -Wextra -Wno-unused-variable -Wno-unused-function
     LDLIBS := -lX11 -lm
 else ifeq ($(PLATFORM), win32)
     CC := clang
-    CFLAGS := -std=c23 -g -Wall -Wextra -Wno-unused-variable -Wno-unused-function
+    CFLAGS := -std=c23 -g -O3 -march=native -Wall -Wextra -Wno-unused-variable -Wno-unused-function
     LDLIBS := -lgdi32 -luser32 -lkernel32 -ldsound
     # LDFLAGS := -Wl,/SUBSYSTEM:WINDOWS
     TARGET_SUFFIX := .exe
 endif
 
 # Common include paths
-CFLAGS += -I$(INCLUDE_DIR) -I$(EXTERNAL_DIR)
+CFLAGS += -I$(INCLUDE_DIR) -I$(EXTERNAL_DIR) -I$(ASSETS_DIR)
 # Common flags
 CFLAGS += -DDEBUG_ARENA_ALLOCATIONS=1 -DDEBUG_ARENA_RESETS=0
 
 # Core source files
-CORE_SRC := $(wildcard $(SRC_DIR)/core/*.c)
-EXTERNAL_SRC := $(SRC_DIR)/external/olive.c
+CORE_SRC := $(wildcard core/*.c)
+EXTERNAL_SRC := external/olive.c
 
 # Platform-specific sources
 ifeq ($(PLATFORM), osx)
@@ -58,7 +58,7 @@ SRC := $(MAIN) $(CORE_SRC) $(EXTERNAL_SRC) $(PLATFORM_SRC)
 # Target
 TARGET := build/software-rendering-c$(TARGET_SUFFIX)
 
-.PHONY: all build run clean
+.PHONY: build run clean obj2c
 
 all: build
 
@@ -68,6 +68,9 @@ build: $(SRC)
 
 run: build
 	./$(TARGET)
+
+obj2c:
+	clang -Wall -Wextra -O2 -o obj2c$(TARGET_SUFFIX) external/obj2c/main.c
 
 clean:
 	rm -rf build

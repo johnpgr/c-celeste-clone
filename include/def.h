@@ -27,6 +27,7 @@
 #define f64 double
 
 #define PI 3.14159265358979323846
+#define EPSILON 1e-6
 
 #define KB(number) ((number) * 1024ull)
 #define MB(number) (KB(number) * 1024ull)

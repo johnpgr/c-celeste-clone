@@ -144,7 +144,7 @@ AudioSource* load_ogg_static(
     const char* filename,
     bool loop
 ) {
-    if (game->active_audio_count >= game->max_audio_sources) {
+    if (game->audio_sources_size >= game->audio_sources_capacity) {
         debug_print("Error: Maximum audio sources reached\n");
         return nullptr;
     }
@@ -246,9 +246,9 @@ AudioSource* load_ogg_static(
     
     // Find empty slot
     AudioSource* source = nullptr;
-    for (usize i = 0; i < game->max_audio_sources; i++) {
-        if (game->loaded_audio[i].type == AUDIO_SOURCE_NONE) {
-            source = &game->loaded_audio[i];
+    for (usize i = 0; i < game->audio_sources_capacity; i++) {
+        if (game->audio_sources[i].type == AUDIO_SOURCE_NONE) {
+            source = &game->audio_sources[i];
             break;
         }
     }
@@ -274,7 +274,7 @@ AudioSource* load_ogg_static(
     source->static_data.frame_count = final_frames;
     source->static_data.current_position = 0;
     
-    game->active_audio_count++;
+    game->audio_sources_size++;
     
     debug_print("Successfully loaded static audio: %zu frames, %d channels, %d Hz\n", 
         source->static_data.frame_count, source->channels, source->sample_rate);
@@ -292,7 +292,7 @@ AudioSource* load_ogg_static_from_memory(
     usize data_size,
     bool loop
 ) {
-    if (game->active_audio_count >= game->max_audio_sources) {
+    if (game->audio_sources_size >= game->audio_sources_capacity) {
         debug_print("Error: Maximum audio sources reached\n");
         return nullptr;
     }
@@ -406,10 +406,10 @@ AudioSource* load_ogg_static_from_memory(
     }
 
     AudioSource* source = nullptr;
-    for (usize i = 0; i < game->max_audio_sources; i++) {
-        debug_print("  Checking slot %zu: type=%d\n", i, game->loaded_audio[i].type);
-        if (game->loaded_audio[i].type == AUDIO_SOURCE_NONE) {
-            source = &game->loaded_audio[i];
+    for (usize i = 0; i < game->audio_sources_capacity; i++) {
+        debug_print("  Checking slot %zu: type=%d\n", i, game->audio_sources[i].type);
+        if (game->audio_sources[i].type == AUDIO_SOURCE_NONE) {
+            source = &game->audio_sources[i];
             debug_print("  Using slot %zu\n", i);
             break;
         }
@@ -448,11 +448,11 @@ AudioSource* load_ogg_static_from_memory(
     source->static_data.frame_count = final_frames;
     source->static_data.current_position = 0;
 
-    game->active_audio_count++;
+    game->audio_sources_size++;
 
     debug_print("Successfully loaded static audio from memory: %zu frames, %d channels, %d Hz (slot %zu)\n",
         source->static_data.frame_count, source->channels, source->sample_rate, 
-        (usize)(source - game->loaded_audio));
+        (usize)(source - game->audio_sources));
 
     // Clean up vorbis and reset transient arena to reclaim temporary processing memory
     stb_vorbis_close(vorbis);
@@ -467,7 +467,7 @@ AudioSource* load_ogg_streaming(
     int stream_buffer_frames,
     bool loop
 ) {
-    if (game->active_audio_count >= game->max_audio_sources) {
+    if (game->audio_sources_size >= game->audio_sources_capacity) {
         debug_print("Error: Maximum audio sources reached\n");
         return nullptr;
     }
@@ -485,9 +485,9 @@ AudioSource* load_ogg_streaming(
     
     // Find empty slot
     AudioSource* source = nullptr;
-    for (usize i = 0; i < game->max_audio_sources; i++) {
-        if (game->loaded_audio[i].type == AUDIO_SOURCE_NONE && !game->loaded_audio[i].stream_data.vorbis) {
-            source = &game->loaded_audio[i];
+    for (usize i = 0; i < game->audio_sources_capacity; i++) {
+        if (game->audio_sources[i].type == AUDIO_SOURCE_NONE && !game->audio_sources[i].stream_data.vorbis) {
+            source = &game->audio_sources[i];
             break;
         }
     }
@@ -532,6 +532,6 @@ AudioSource* load_ogg_streaming(
     source->stream_data.buffer_valid = 0;
     source->stream_data.end_of_file = false;
     
-    game->active_audio_count++;
+    game->audio_sources_size++;
     return source;
 }

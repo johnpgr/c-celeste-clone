@@ -327,7 +327,7 @@ void audio_update_buffer(Game* game) {
     );
     
     if (samples_written < AUDIO_CAPACITY) {
-        debug_print("Ring buffer is full, some audio data was dropped\n");
+        /* debug_print("Ring buffer is full, some audio data was dropped\n"); */
     }
     
     SetEvent(global_audio_state.audio_event);

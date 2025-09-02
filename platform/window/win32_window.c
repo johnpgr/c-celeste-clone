@@ -57,6 +57,9 @@ static void update_key_state(WPARAM wParam, bool is_pressed) {
         case 'W':
             g_input_state.keys[WINDOW_KEY_W] = is_pressed;
             break;
+        case 'F':
+            g_input_state.keys[WINDOW_KEY_F] = is_pressed;
+            break;
         default:
             break;
     }
