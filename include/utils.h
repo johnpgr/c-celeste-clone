@@ -6,7 +6,9 @@
 #include <windows.h>
 #include <stdint.h>
 #else
+#define __USE_POSIX199309
 #include <time.h>
+#include <unistd.h>
 #endif
 
 #define NANOS_PER_SEC (1000*1000*1000)

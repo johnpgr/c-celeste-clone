@@ -24,7 +24,7 @@ CFLAGS := -std=c23 -g -O3 -march=native -Wall -Wextra -Wno-unused-variable -Wno-
 ifeq ($(PLATFORM), osx)
     LDLIBS := -framework Cocoa -framework AudioToolbox
 else ifeq ($(PLATFORM), linux)
-    LDLIBS := -lX11 -lm
+    LDLIBS := -lX11 -lXext -lm
 else ifeq ($(PLATFORM), win32)
     LDLIBS := -lgdi32 -luser32 -lkernel32 -ldsound
     # LDFLAGS := -Wl,/SUBSYSTEM:WINDOWS
@@ -70,7 +70,7 @@ obj2c:
 	$(CC) -O3 -o obj2c$(TARGET_SUFFIX) external/obj2c/main.c
 
 teapot:
-	./obj2c$(TARGET_SUFFIX) $(ASSETS_DIR)/utah-teapot.obj $(ASSETS_DIR)/utah-teapot.h
+	./obj2c$(TARGET_SUFFIX) $(ASSETS_DIR)/utah-teapot.obj -o $(ASSETS_DIR)/utah-teapot.h
 
 clean:
 	rm -rf build
