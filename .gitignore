@@ -3,3 +3,5 @@ build/
 *.ppm
 compile_commands.json
 project.rdbg
+./obj2c
+./obj2c.exe

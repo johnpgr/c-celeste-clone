@@ -67,7 +67,7 @@ run: build
 	./$(TARGET)
 
 obj2c:
-	$(CC) -O3 -o obj2c$(TARGET_SUFFIX) external/obj2c/main.c
+	$(CC) -O3 -o obj2c$(TARGET_SUFFIX) tools/obj2c/obj2c.c
 
 teapot:
 	./obj2c$(TARGET_SUFFIX) $(ASSETS_DIR)/utah-teapot.obj -o $(ASSETS_DIR)/utah-teapot.h
