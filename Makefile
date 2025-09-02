@@ -24,7 +24,7 @@ CFLAGS := -std=c23 -g -O3 -march=native -Wall -Wextra -Wno-unused-variable -Wno-
 ifeq ($(PLATFORM), osx)
     LDLIBS := -framework Cocoa -framework AudioToolbox
 else ifeq ($(PLATFORM), linux)
-    LDLIBS := -lX11 -lXext -lm
+    LDLIBS := -lX11 -lXext -lm -lpulse -lpulse-simple
 else ifeq ($(PLATFORM), win32)
     LDLIBS := -lgdi32 -luser32 -lkernel32 -ldsound
     # LDFLAGS := -Wl,/SUBSYSTEM:WINDOWS
