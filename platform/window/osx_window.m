@@ -377,9 +377,11 @@ static int mapKeyCode(unsigned short keyCode) {
         case 53: return WINDOW_KEY_ESCAPE;  // Escape
         case 49: return WINDOW_KEY_SPACE;   // Space
         case 0:  return WINDOW_KEY_A;       // A
-        case 2:  return WINDOW_KEY_D;       // D
         case 1:  return WINDOW_KEY_S;       // S
+        case 2:  return WINDOW_KEY_D;       // D
         case 13: return WINDOW_KEY_W;       // W
+        case 3:  return WINDOW_KEY_F;       // F
+        case 46: return WINDOW_KEY_M;       // M
         default: return keyCode;
     }
 }
@@ -395,6 +397,8 @@ static unsigned short mapAbstractKeyToMac(WindowKey key) {
         case WINDOW_KEY_D: return 2;
         case WINDOW_KEY_S: return 1;
         case WINDOW_KEY_W: return 13;
+        case WINDOW_KEY_F: return 3;
+        case WINDOW_KEY_M: return 46;
         default: return 0;
     }
 }
@@ -563,6 +567,7 @@ void window_set_resizable(bool resizable) {
     } else {
         styleMask &= ~NSWindowStyleMaskResizable;
     }
+
     
     [appDelegate.window setStyleMask:styleMask];
 }

@@ -4,12 +4,14 @@
 #include "stb_vorbis.c"
 
 void start_stream_source(AudioSource* source) {
-    assert(source->type == AUDIO_SOURCE_STREAMING && "tried to start stream source of a non-streaming audio source");
+    assert(source->type == AUDIO_SOURCE_STREAMING 
+           && "tried to start stream source of a non-streaming audio source");
     stb_vorbis_seek_start(source->stream_data.vorbis);
 }
 
 void close_stream_source(AudioSource* source) {
-    assert(source->type == AUDIO_SOURCE_STREAMING && "tried to close stream source of a non-streaming audio source");
+    assert(source->type == AUDIO_SOURCE_STREAMING 
+           && "tried to close stream source of a non-streaming audio source");
     stb_vorbis_close(source->stream_data.vorbis);
 }
 
@@ -46,7 +48,7 @@ bool refill_stream_buffer(AudioSource* source) {
     }
 }
 
-inline i16* resample_audio(
+internal i16* resample_audio(
     Arena* arena,
     i16* input_samples,
     usize input_frames,
@@ -111,7 +113,7 @@ inline i16* resample_audio(
 }
 
 // Channel conversion helper
-inline void convert_channels(
+internal void convert_channels(
     i16* input,
     int input_channels,
     i16* output,

@@ -530,7 +530,11 @@ OLIVECDEF Olivec_Canvas olivec_subcanvas(Olivec_Canvas oc, int x, int y, int w, 
 #define OLIVEC_GREEN(color) (((color)&0x0000FF00)>>(8*1))
 #define OLIVEC_BLUE(color)  (((color)&0x00FF0000)>>(8*2))
 #define OLIVEC_ALPHA(color) (((color)&0xFF000000)>>(8*3))
+#ifdef __APPLE__
+#define OLIVEC_RGBA(r, g, b, a) ((((b)&0xFF)<<(8*0)) | (((g)&0xFF)<<(8*1)) | (((r)&0xFF)<<(8*2)) | (((a)&0xFF)<<(8*3)))
+#else
 #define OLIVEC_RGBA(r, g, b, a) ((((r)&0xFF)<<(8*0)) | (((g)&0xFF)<<(8*1)) | (((b)&0xFF)<<(8*2)) | (((a)&0xFF)<<(8*3)))
+#endif
 
 OLIVECDEF void olivec_blend_color(uint32_t *c1, uint32_t c2)
 {

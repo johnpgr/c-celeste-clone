@@ -69,12 +69,15 @@ Game game_init(void) {
         .frame_count             = 0,
         .fps_timer_start         = current_time_nanos(),
         .current_fps             = 0.0,
+
         .permanent_arena         = permanent_arena,
         .transient_arena         = transient_arena,
+
         .display                 = global.display,
         .display_zbuffer         = global.zbuffer,
         .display_width           = DISPLAY_WIDTH,
         .display_height          = DISPLAY_HEIGHT,
+
         .audio                   = global.audio,
         .audio_capacity          = AUDIO_CAPACITY,
         .audio_sample_rate       = AUDIO_SAMPLE_RATE,
@@ -156,7 +159,8 @@ void game_update_and_render(Game* game) {
         game->display_height,
         game->display_width
     );
-    olivec_fill(oc, 0xFFAAFFFF);
+    olivec_fill(oc, RGBA(200, 200, 0, 255));
+
     for (size_t i = 0; i < game->display_width*game->display_height; ++i) {
         game->display_zbuffer[i] = 0;
     }
@@ -205,7 +209,7 @@ void game_update_and_render(Game* game) {
                         float far_ = 5.0f;
                         if (1.0f/far_ < z && z < 1.0f/near_ && z > game->display_zbuffer[y*game->display_width + x]) {
                             game->display_zbuffer[y*game->display_width + x] = z;
-                            OLIVEC_PIXEL(oc, x, y) = 0xFFFF5050;
+                            OLIVEC_PIXEL(oc, x, y) = RGBA(0, 0, 255, 255);
 
                             z = 1.0f/z;
                             if (z >= 1.0) {

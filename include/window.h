@@ -23,6 +23,7 @@ typedef enum {
     WINDOW_KEY_S,
     WINDOW_KEY_W,
     WINDOW_KEY_F,
+    WINDOW_KEY_M,
     WINDOW_KEY_COUNT  // Keep track of total keys
 } WindowKey;
 

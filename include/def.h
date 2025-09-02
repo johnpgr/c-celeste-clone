@@ -34,7 +34,11 @@
 #define GB(number) (MB(number) * 1024ull)
 #define TB(number) (GB(number) * 1024ull)
 #define ARRAY_LEN(arr) (sizeof(arr) / sizeof((arr)[0]))
+#ifdef __APPLE__
+#define RGBA(r, g, b, a) ((((b)&0xFF)<<(8*0)) | (((g)&0xFF)<<(8*1)) | (((r)&0xFF)<<(8*2)) | (((a)&0xFF)<<(8*3)))
+#else
 #define RGBA(r, g, b, a) ((((r)&0xFF)<<(8*0)) | (((g)&0xFF)<<(8*1)) | (((b)&0xFF)<<(8*2)) | (((a)&0xFF)<<(8*3)))
+#endif
 #define CLAMP(val, lo, hi) ((val) < (lo) ? (lo) : ((val) > (hi) ? (hi) : (val)))
 
 inline u32 trunc_u64(u64 val) {

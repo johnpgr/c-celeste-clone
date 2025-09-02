@@ -75,8 +75,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
         // TODO: Improve this key handling
         static bool space_was_pressed = false;
         static bool f_was_pressed = false;
+        static bool m_was_pressed = false;
         bool space_is_pressed = window_get_key_state(WINDOW_KEY_SPACE);
         bool f_is_pressed = window_get_key_state(WINDOW_KEY_F);
+        bool m_is_pressed = window_get_key_state(WINDOW_KEY_M);
         
         if (space_is_pressed && !space_was_pressed) {
             game_play_audio_source(explosion_ogg);
@@ -87,6 +89,17 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
             game.frame_skip = !game.frame_skip;
         }
         f_was_pressed = f_is_pressed;
+
+        if (m_is_pressed && !m_was_pressed) {
+            static f32 saved_volume = 1.0f;
+            if (game.audio_volume > 0.0f) {
+                saved_volume = game.audio_volume;
+                game.audio_volume = 0.0f;
+            } else {
+                game.audio_volume = saved_volume;
+            }
+        }
+        m_was_pressed = m_is_pressed;
 
         while (accumulator >= NANOS_PER_UPDATE) {
             game_generate_audio(&game);

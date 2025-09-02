@@ -17,26 +17,23 @@ else
     $(error Unsupported platform: $(UNAME_S))
 endif
 
+CC := clang
+CFLAGS := -std=c23 -g -O3 -march=native -Wall -Wextra -Wno-unused-variable -Wno-unused-function
+
 # Compiler settings based on platform
 ifeq ($(PLATFORM), osx)
-    CC := clang
-    CFLAGS := -std=c23 -g -O3 -march=native -Wall -Wextra -Wno-unused-variable -Wno-unused-function
     LDLIBS := -framework Cocoa -framework AudioToolbox
 else ifeq ($(PLATFORM), linux)
-    CC := clang
-    CFLAGS := -std=c23 -g -O3 -march=native -Wall -Wextra -Wno-unused-variable -Wno-unused-function
     LDLIBS := -lX11 -lm
 else ifeq ($(PLATFORM), win32)
-    CC := clang
-    CFLAGS := -std=c23 -g -O3 -march=native -Wall -Wextra -Wno-unused-variable -Wno-unused-function
     LDLIBS := -lgdi32 -luser32 -lkernel32 -ldsound
     # LDFLAGS := -Wl,/SUBSYSTEM:WINDOWS
     TARGET_SUFFIX := .exe
 endif
 
-# Common include paths
+# Our include paths
 CFLAGS += -I$(INCLUDE_DIR) -I$(EXTERNAL_DIR) -I$(ASSETS_DIR)
-# Common flags
+# Our flags
 CFLAGS += -DDEBUG_ARENA_ALLOCATIONS=1 -DDEBUG_ARENA_RESETS=0
 
 # Core source files
@@ -58,7 +55,7 @@ SRC := $(MAIN) $(CORE_SRC) $(EXTERNAL_SRC) $(PLATFORM_SRC)
 # Target
 TARGET := build/software-rendering-c$(TARGET_SUFFIX)
 
-.PHONY: build run clean obj2c
+.PHONY: build run clean obj2c teapot
 
 all: build
 
@@ -70,7 +67,10 @@ run: build
 	./$(TARGET)
 
 obj2c:
-	clang -Wall -Wextra -O2 -o obj2c$(TARGET_SUFFIX) external/obj2c/main.c
+	$(CC) -O3 -o obj2c$(TARGET_SUFFIX) external/obj2c/main.c
+
+teapot:
+	./obj2c$(TARGET_SUFFIX) $(ASSETS_DIR)/utah-teapot.obj $(ASSETS_DIR)/utah-teapot.h
 
 clean:
 	rm -rf build
