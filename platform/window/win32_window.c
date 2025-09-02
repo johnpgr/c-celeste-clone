@@ -130,8 +130,17 @@ static HBITMAP create_dib_section(HDC hdc, int width, int height, void** pixel_d
     g_custom_bitmap_info.masks[1] = 0x0000FF00; // Green mask  
     g_custom_bitmap_info.masks[2] = 0x00FF0000; // Blue mask
     g_custom_bitmap_info.masks[3] = 0xFF000000; // Alpha mask
+    BITMAPINFO bitmapinfo = {};
 
-    return CreateDIBSection(hdc, (BITMAPINFO*)&g_custom_bitmap_info, DIB_RGB_COLORS, pixel_data, nullptr, 0);
+    bitmapinfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    bitmapinfo.bmiHeader.biWidth = width;
+    bitmapinfo.bmiHeader.biHeight = -height;
+    bitmapinfo.bmiHeader.biPlanes = 1;
+    bitmapinfo.bmiHeader.biBitCount = 32;
+    bitmapinfo.bmiHeader.biCompression = BI_RGB;
+    bitmapinfo.bmiHeader.biSizeImage = 0;
+
+    return CreateDIBSection(hdc, &bitmapinfo, DIB_RGB_COLORS, pixel_data, nullptr, 0);
 }
 
 static void setup_double_buffering() {
