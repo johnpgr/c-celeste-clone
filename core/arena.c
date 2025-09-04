@@ -13,7 +13,7 @@ void* arena_alloc(Arena* arena, usize size) {
     void* ptr = arena->memory + arena->offset;
     arena->offset += aligned_size;
     
-#if DEBUG_ARENA_ALLOCATIONS
+#if DEBUG_MODE
     debug_print("%s arena alloc: %.1f KB at offset %.1f KB (remaining: %.1f KB)\n", 
                arena->name, aligned_size / 1024.0f, (arena->offset - aligned_size) / 1024.0f, 
                (arena->size - arena->offset) / 1024.0f);
@@ -23,9 +23,6 @@ void* arena_alloc(Arena* arena, usize size) {
 }
 
 void arena_reset(Arena* arena) {
-#if DEBUG_ARENA_RESETS
-    debug_print("%s arena reset: freeing %.1f KB\n", arena->name, arena->offset / 1024.0f);
-#endif
     arena->offset = 0;
 }
 

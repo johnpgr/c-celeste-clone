@@ -12,7 +12,11 @@
  * @param format The format string, similar to printf.
  * @param ... The variable arguments to be formatted.
  */
-inline void debug_print(const char* format, ...) {
+void debug_print(const char* format, ...) {
+#ifndef DEBUG_MODE
+    return;
+#endif
+
     const int buffer_size = 1024;
     char buffer[buffer_size];
 

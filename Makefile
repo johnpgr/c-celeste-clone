@@ -34,7 +34,7 @@ endif
 # Our include paths
 CFLAGS += -I$(INCLUDE_DIR) -I$(EXTERNAL_DIR) -I$(ASSETS_DIR)
 # Our flags
-CFLAGS += -DDEBUG_ARENA_ALLOCATIONS=1 -DDEBUG_ARENA_RESETS=0
+CFLAGS += -DDEBUG_MODE=1
 
 # Core source files
 CORE_SRC := $(wildcard core/*.c)

@@ -65,7 +65,7 @@ inline u32 trunc_u64(u64 val) {
     return (u32)val;
 }
 
-extern void debug_print(const char* format, ...);
+void debug_print(const char* format, ...);
 
 #define TODO(msg) do { \
     debug_print("%s:%d:%d [TODO][%s()] %s\n", __FILE__, __LINE__, 1, __func__, msg); \
