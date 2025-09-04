@@ -24,6 +24,12 @@ internal struct {
     bool should_stop;
     u32 buffer_size;
     u32 samples_per_buffer;
+
+    // Streaming/latency control
+    u32 block_align;        // bytes per frame (all channels)
+    u32 block_bytes;        // one "tick" worth in bytes (1/fps seconds)
+    u32 safety_bytes;       // how far ahead of the play cursor we keep filled
+    u32 running_write_pos;  // next byte offset to write into secondary buffer
 } global_audio_state;
 
 internal void ring_buffer_init(RingBuffer* rb, usize capacity) {
@@ -76,103 +82,104 @@ internal usize ring_buffer_read(RingBuffer* rb, i16* data, usize samples) {
 
 internal DWORD WINAPI audio_thread_proc(LPVOID param) {
     Game* game = (Game*)param;
-    DWORD last_play_pos = 0;
-    
+
     while (!global_audio_state.should_stop) {
-        WaitForSingleObject(global_audio_state.audio_event, 1000.0f / game->fps);
+        DWORD wait_ms = (game && game->fps) ? (DWORD)(1000 / game->fps) : 16;
+        WaitForSingleObject(global_audio_state.audio_event, wait_ms);
         
         if (!global_audio_state.initialized || !game) {
             continue;
         }
-        
-        DWORD play_pos, write_pos;
+
+        DWORD play_pos = 0, write_pos_ignored = 0;
         HRESULT hr = IDirectSoundBuffer_GetCurrentPosition(
-            global_audio_state.secondary_buffer, &play_pos, &write_pos);
-        
+            global_audio_state.secondary_buffer, &play_pos, &write_pos_ignored);
         if (FAILED(hr)) {
             continue;
         }
-        
-        DWORD bytes_to_write;
-        if (play_pos >= last_play_pos) {
-            bytes_to_write = play_pos - last_play_pos;
-        } else {
-            bytes_to_write = (global_audio_state.buffer_size - last_play_pos) + play_pos;
-        }
-        
+
+        const u32 buffer_size = global_audio_state.buffer_size;
+        const u32 block_align = global_audio_state.block_align;
+        const u32 safety_bytes = global_audio_state.safety_bytes;
+
+        u32 target_write_pos = (play_pos + safety_bytes) % buffer_size;
+        u32 running_write_pos = global_audio_state.running_write_pos;
+
+        u32 bytes_to_write = (target_write_pos + buffer_size - running_write_pos) % buffer_size;
+        // Align to frame boundary
+        bytes_to_write -= bytes_to_write % block_align;
+
         if (bytes_to_write == 0) {
             continue;
         }
-        
-        u32 samples_to_write = bytes_to_write / sizeof(i16);
-        
-        LPVOID audio_ptr1, audio_ptr2;
-        DWORD audio_bytes1, audio_bytes2;
-        
+
+        LPVOID audio_ptr1 = NULL, audio_ptr2 = NULL;
+        DWORD audio_bytes1 = 0, audio_bytes2 = 0;
+
         hr = IDirectSoundBuffer_Lock(
             global_audio_state.secondary_buffer,
-            last_play_pos,
+            running_write_pos,
             bytes_to_write,
             &audio_ptr1, &audio_bytes1,
             &audio_ptr2, &audio_bytes2,
             0
         );
-        
         if (FAILED(hr)) {
             continue;
         }
-        
+
         if (audio_ptr1 && audio_bytes1 > 0) {
             i16* audio_data = (i16*)audio_ptr1;
             u32 samples_in_region1 = audio_bytes1 / sizeof(i16);
-            
+
             usize samples_read = ring_buffer_read(
-                &global_audio_state.ring_buffer, 
-                audio_data, 
+                &global_audio_state.ring_buffer,
+                audio_data,
                 samples_in_region1
             );
-            
+
             if (samples_read < samples_in_region1) {
-                memset(audio_data + samples_read, 0, 
+                memset(audio_data + samples_read, 0,
                        (samples_in_region1 - samples_read) * sizeof(i16));
             }
-            
-            if (game->audio_volume != 1.0f) {
+
+            if (game->audio_volume != 1.0f && samples_read > 0) {
                 for (u32 i = 0; i < samples_read; i++) {
                     audio_data[i] = (i16)((float)audio_data[i] * game->audio_volume);
                 }
             }
         }
-        
+
         if (audio_ptr2 && audio_bytes2 > 0) {
             i16* audio_data = (i16*)audio_ptr2;
             u32 samples_in_region2 = audio_bytes2 / sizeof(i16);
-            
+
             usize samples_read = ring_buffer_read(
-                &global_audio_state.ring_buffer, 
-                audio_data, 
+                &global_audio_state.ring_buffer,
+                audio_data,
                 samples_in_region2
             );
-            
+
             if (samples_read < samples_in_region2) {
-                memset(audio_data + samples_read, 0, 
+                memset(audio_data + samples_read, 0,
                        (samples_in_region2 - samples_read) * sizeof(i16));
             }
-            
-            if (game->audio_volume != 1.0f) {
+
+            if (game->audio_volume != 1.0f && samples_read > 0) {
                 for (u32 i = 0; i < samples_read; i++) {
                     audio_data[i] = (i16)((float)audio_data[i] * game->audio_volume);
                 }
             }
         }
-        
+
         IDirectSoundBuffer_Unlock(
             global_audio_state.secondary_buffer,
             audio_ptr1, audio_bytes1,
             audio_ptr2, audio_bytes2
         );
-        
-        last_play_pos = play_pos;
+
+        global_audio_state.running_write_pos =
+            (running_write_pos + bytes_to_write) % buffer_size;
     }
     
     return 0;
@@ -229,9 +236,11 @@ void audio_init(Game* game) {
     if (FAILED(hr)) {
         debug_print("Error: Could not set primary buffer format (hr: 0x%08X)\n", (u32)hr);
     }
-    
-    global_audio_state.buffer_size = game->audio_channels * 
-        (game->audio_sample_rate / game->fps) * sizeof(i16) * NUM_BUFFERS;
+
+    // Derived sizes for latency and buffer management
+    global_audio_state.block_align = wave_format.nBlockAlign;
+    global_audio_state.block_bytes = (u32)((game->audio_sample_rate / game->fps) * wave_format.nBlockAlign);
+    global_audio_state.buffer_size = global_audio_state.block_bytes * NUM_BUFFERS;
     global_audio_state.samples_per_buffer = global_audio_state.buffer_size / sizeof(i16);
     
     DSBUFFERDESC secondary_desc = {0};
@@ -290,6 +299,18 @@ void audio_init(Game* game) {
         IDirectSoundBuffer_Release(global_audio_state.primary_buffer);
         IDirectSound_Release(global_audio_state.dsound);
         return;
+    }
+
+    // Initialize write position and target latency (one block ahead)
+    {
+        DWORD play_pos = 0, write_pos = 0;
+        if (SUCCEEDED(IDirectSoundBuffer_GetCurrentPosition(
+                global_audio_state.secondary_buffer, &play_pos, &write_pos))) {
+            global_audio_state.running_write_pos = write_pos;
+        } else {
+            global_audio_state.running_write_pos = 0;
+        }
+        global_audio_state.safety_bytes = global_audio_state.block_bytes; // ~1 frame (~16.7ms)
     }
     
     global_audio_state.audio_event = CreateEvent(nullptr, false, false, nullptr);
