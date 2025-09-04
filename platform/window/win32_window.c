@@ -213,7 +213,6 @@ void window_init(Game* game) {
 
     // Get a device context for the window
     g_window_state.hdc = GetDC(g_window_state.h_wnd);
-    SetStretchBltMode(g_window_state.hdc, HALFTONE); // Better quality scaling
     debug_print("  Device context obtained\n");
     
     setup_double_buffering();
