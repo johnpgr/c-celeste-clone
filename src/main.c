@@ -5,30 +5,27 @@
 #include "utils.h"
 #include "ogg.h"
 
-inline void update_fps_counter(Game* game, u64 current_time) {
+inline void update_fps_counter(Game* game, uint64 current_time) {
     game->frame_count++;
     if(current_time - game->fps_timer_start >= NANOS_PER_SEC) {
-        game->current_fps = (double)game->frame_count * NANOS_PER_SEC / (current_time - game->fps_timer_start);
+        game->current_fps = (real64)game->frame_count * NANOS_PER_SEC
+            / (current_time - game->fps_timer_start);
         game->frame_count = 0;
         game->fps_timer_start = current_time;
     }
 }
 
-int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
+int main(int argc, [[maybe_unused]] char* argv[argc + 1]) {
     Game game = game_init();
 
     window_init(&game);
+    window_set_resizable(true);
+
     audio_init(&game);
 
-    constexpr u8 background_audio[] = {
-        #embed "assets/Background.ogg"
-    };
-    constexpr usize background_audio_size = sizeof(background_audio);
-
-    AudioSource* background_ogg = load_ogg_static_from_memory(
+    AudioSource* background_ogg = load_ogg_static(
         &game,
-        background_audio,
-        background_audio_size,
+        "assets/Background.ogg",
         false
     );
     if (!background_ogg) {
@@ -39,30 +36,23 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
     background_ogg->volume = 0.5f;
     game_play_audio_source(background_ogg);
 
-    constexpr u8 explosion_audio[] = {
-        #embed "assets/Explosion.ogg"
-    };
-    constexpr usize explosion_audio_size = sizeof(explosion_audio);
-
-    AudioSource* explosion_ogg = load_ogg_static_from_memory(
+    AudioSource* explosion_ogg = load_ogg_static(
         &game,
-        explosion_audio,
-        explosion_audio_size,
+        "assets/Explosion.ogg",
         false
     );
     explosion_ogg->volume = 0.3f;
 
-    const u64 NANOS_PER_UPDATE = NANOS_PER_SEC / game.fps;
-    u64 accumulator = 0;
-    u64 last_time = current_time_nanos();
-
+    const uint64 NANOS_PER_UPDATE = NANOS_PER_SEC / game.fps;
+    uint64 accumulator = 0;
+    uint64 last_time = current_time_nanos();
 
     // TODO: Separate render thread from main thread 
     // (for resizing, moving the window without stopping the render)
     // Audio thread is already separate
     while (!window_should_close()) {
-        u64 current_time = current_time_nanos();
-        u64 delta_time = current_time - last_time;
+        uint64 current_time = current_time_nanos();
+        uint64 delta_time = current_time - last_time;
         last_time = current_time;
         accumulator += delta_time;
 
@@ -91,7 +81,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
         f_was_pressed = f_is_pressed;
 
         if (m_is_pressed && !m_was_pressed) {
-            static f32 saved_volume = 1.0f;
+            static real32 saved_volume = 1.0f;
             if (game.audio_volume > 0.0f) {
                 saved_volume = game.audio_volume;
                 game.audio_volume = 0.0f;
@@ -129,7 +119,12 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
 }
 
 #ifdef _WIN32
-int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
+int WINAPI WinMain(
+   [[maybe_unused]] HINSTANCE hInstance,
+   [[maybe_unused]] HINSTANCE hPrevInstance,
+   [[maybe_unused]] LPSTR lpCmdLine,
+   [[maybe_unused]] int nShowCmd
+) {
     return main(0, nullptr);
 }
 #endif

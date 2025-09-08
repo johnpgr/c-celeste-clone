@@ -85,7 +85,7 @@ static bool create_ximage(int width, int height) {
             g_x11_state.visual,
             g_x11_state.depth,
             ZPixmap,
-            NULL,
+            nullptr,
             &g_x11_state.shm_info,
             width,
             height
@@ -141,7 +141,7 @@ static bool create_ximage(int width, int height) {
         0
     );
     
-    return g_x11_state.ximage != NULL;
+    return g_x11_state.ximage != nullptr;
 }
 
 /**
@@ -156,7 +156,7 @@ void window_init(Game* game) {
     memset(&g_input_state, 0, sizeof(g_input_state));
     
     // Open connection to X server
-    g_x11_state.display = XOpenDisplay(NULL);
+    g_x11_state.display = XOpenDisplay(nullptr);
     if (!g_x11_state.display) {
         debug_print("Error: Cannot connect to X server\n");
         return;
@@ -203,7 +203,7 @@ void window_init(Game* game) {
     XSetWMProtocols(g_x11_state.display, g_x11_state.window, &wm_delete, 1);
     
     // Create graphics context
-    g_x11_state.gc = XCreateGC(g_x11_state.display, g_x11_state.window, 0, NULL);
+    g_x11_state.gc = XCreateGC(g_x11_state.display, g_x11_state.window, 0, nullptr);
     
     // Create XImage for framebuffer
     if (!create_ximage(game->display_width, game->display_height)) {
@@ -263,13 +263,13 @@ void window_cleanup(void) {
             shmctl(g_x11_state.shm_info.shmid, IPC_RMID, 0);
         }
         XDestroyImage(g_x11_state.ximage);
-        g_x11_state.ximage = NULL;
+        g_x11_state.ximage = nullptr;
         debug_print("  XImage destroyed\n");
     }
     
     if (g_x11_state.gc) {
         XFreeGC(g_x11_state.display, g_x11_state.gc);
-        g_x11_state.gc = NULL;
+        g_x11_state.gc = nullptr;
     }
     
     if (g_x11_state.window) {
@@ -280,7 +280,7 @@ void window_cleanup(void) {
     
     if (g_x11_state.display) {
         XCloseDisplay(g_x11_state.display);
-        g_x11_state.display = NULL;
+        g_x11_state.display = nullptr;
         debug_print("  X11 connection closed\n");
     }
     

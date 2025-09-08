@@ -1,14 +1,9 @@
-#include <math.h>
 #include <stdio.h>
 #include <string.h>
 #include "game.h"
 #include "ogg.h"
-#include "utah-teapot.h"
 #include "utils.h"
 #include "vector.c"
-
-#define OLIVEC_IMPLEMENTATION
-#include "olive.c"
 
 #define MAX_AUDIO_SOURCES 16
 #define STREAM_BUFFER_FRAMES 4096
@@ -17,12 +12,11 @@
 #define TRANSIENT_ARENA_SIZE (128 * 1024 * 1024)
 
 static struct {
-    u32 display[DISPLAY_WIDTH * DISPLAY_HEIGHT];
-    f32 zbuffer[DISPLAY_WIDTH * DISPLAY_HEIGHT];
-    i16 audio[AUDIO_CAPACITY];
+    uint32 display[DISPLAY_WIDTH * DISPLAY_HEIGHT];
+    int16 audio[AUDIO_CAPACITY];
     AudioSource audio_sources[MAX_AUDIO_SOURCES];
-    u8 permanent_memory[PERMANENT_ARENA_SIZE];
-    u8 transient_memory[TRANSIENT_ARENA_SIZE];
+    uint8 permanent_memory[PERMANENT_ARENA_SIZE];
+    uint8 transient_memory[TRANSIENT_ARENA_SIZE];
 } global;
 
 typedef enum {
@@ -74,7 +68,6 @@ Game game_init(void) {
         .transient_arena         = transient_arena,
 
         .display                 = global.display,
-        .display_zbuffer         = global.zbuffer,
         .display_width           = DISPLAY_WIDTH,
         .display_height          = DISPLAY_HEIGHT,
 
@@ -96,139 +89,39 @@ internal void print_arena_stats(Game* game) {
     debug_print("  Permanent: %.1f/%.1f KB used (%.1f%%, %.1f KB remaining)\n",
                arena_get_used(&game->permanent_arena) / 1024.0f, 
                game->permanent_arena.size / 1024.0f,
-               (float)arena_get_used(&game->permanent_arena) / game->permanent_arena.size * 100.0f,
+               (real32)arena_get_used(&game->permanent_arena) / game->permanent_arena.size * 100.0f,
                arena_get_remaining(&game->permanent_arena) / 1024.0f);
     debug_print("  Transient: %.1f/%.1f KB used (%.1f%%, %.1f KB remaining)\n",
                arena_get_used(&game->transient_arena) / 1024.0f,
                game->transient_arena.size / 1024.0f,
-               (float)arena_get_used(&game->transient_arena) / game->transient_arena.size * 100.0f,
+               (real32)arena_get_used(&game->transient_arena) / game->transient_arena.size * 100.0f,
                arena_get_remaining(&game->transient_arena) / 1024.0f);
 }
 
-internal void draw_weird_triangle(Game* game) {
-    static float angle = 0.0f;
-    static float cx = DISPLAY_WIDTH / 2.0f;
-    static float cy = DISPLAY_HEIGHT / 2.0f;
-    static float dx = 800.0;
-    static float dy = 800.0;
-    usize vert_count = 3;
-    float dangle = 2 * PI / vert_count;
-    float mag = 100;
-
-    Olivec_Canvas oc = {
-        .pixels = game->display,
-        .width  = game->display_width,
-        .height = game->display_height,
-        .stride = game->display_width,
-    };
-
-    olivec_triangle3c(
-        oc,
-        cx + cosf(dangle * 0 + angle) * mag, cy + sinf(dangle * 0 + angle) * mag,
-        cx + cosf(dangle * 1 + angle) * mag, cy + sinf(dangle * 1 + angle) * mag,
-        cx + cosf(dangle * 2 + angle) * mag, cy + sinf(dangle * 2 + angle) * mag,
-        RGBA(255, 0, 0, 255),
-        RGBA(0, 255, 0, 255),
-        RGBA(0, 0, 255, 255)
-    );
-    angle += 2 * PI * DELTA_TIME;
-    float nx = cx + dx * DELTA_TIME;
-    if(nx - mag <= 0 || nx + mag >= game->display_width) {
-        dx *= -1.0;
-        game_play_audio_source(&game->audio_sources[1]);
-    } else {
-        cx = nx;
-    }
-    float ny = cy + dy * DELTA_TIME;
-    if (ny - mag <= 0 || ny + mag >= game->display_height) {
-        dy *= -1.0;
-        game_play_audio_source(&game->audio_sources[1]);
-    } else {
-        cy = ny;
+internal void render_weird_gradient(Game* game) {
+    uint8* row = (uint8*)game->display;
+    for (usize y = 0; y < game->display_height; y++) {
+        uint32* pixel = (uint32*)row;
+        for (usize x = 0; x < game->display_width; x++) {
+            uint8 blue = (x + game->blue_offset);
+            uint8 green = (y + game->green_offset);
+            *pixel++ = RGBA(0, green, blue, 255);
+        }
+        row += game->display_width * sizeof(uint32);
     }
 }
 
-float angle = 0;
-
 void game_update_and_render(Game* game) {
-    angle += 0.25 * PI * DELTA_TIME;
+    game->blue_offset += 1;
+    game->green_offset += 2;
 
-    Olivec_Canvas oc = olivec_canvas(
-        game->display,
-        game->display_width,
-        game->display_height,
-        game->display_width
-    );
-    olivec_fill(oc, RGBA(200, 200, 0, 255));
+    static uint32 COLOR_BLACK = RGBA(0, 0, 0, 255);
 
     for (size_t i = 0; i < game->display_width*game->display_height; ++i) {
-        game->display_zbuffer[i] = 0;
+        game->display[i] = COLOR_BLACK;
     }
 
-    Vec3 camera = vec3(0, 0, 1);
-    for (size_t i = 0; i < faces_count; ++i) {
-        int a, b, c;
-
-        a = faces[i][FACE_V1];
-        b = faces[i][FACE_V2];
-        c = faces[i][FACE_V3];
-        Vec3 v1 = vec3_rotate_y(vec3(vertices[a][0], vertices[a][1], vertices[a][2]), angle);
-        Vec3 v2 = vec3_rotate_y(vec3(vertices[b][0], vertices[b][1], vertices[b][2]), angle);
-        Vec3 v3 = vec3_rotate_y(vec3(vertices[c][0], vertices[c][1], vertices[c][2]), angle);
-        v1.z += 2.5; v2.z += 2.5; v3.z += 2.5;
-
-        a = faces[i][FACE_VN1];
-        b = faces[i][FACE_VN2];
-        c = faces[i][FACE_VN3];
-        Vec3 vn1 = vec3_rotate_y(vec3(normals[a][0], normals[a][1], normals[a][2]), angle);
-        Vec3 vn2 = vec3_rotate_y(vec3(normals[b][0], normals[b][1], normals[b][2]), angle);
-        Vec3 vn3 = vec3_rotate_y(vec3(normals[c][0], normals[c][1], normals[c][2]), angle);
-        if (vec3_dot(camera, vn1) > 0.0 &&
-            vec3_dot(camera, vn2) > 0.0 &&
-            vec3_dot(camera, vn3) > 0.0) continue;
-
-        Vec2 p1 = project_2d_scr(project_3d_2d(v1), game->display_width, game->display_height);
-        Vec2 p2 = project_2d_scr(project_3d_2d(v2), game->display_width, game->display_height);
-        Vec2 p3 = project_2d_scr(project_3d_2d(v3), game->display_width, game->display_height);
-
-        int x1 = p1.x;
-        int x2 = p2.x;
-        int x3 = p3.x;
-        int y1 = p1.y;
-        int y2 = p2.y;
-        int y3 = p3.y;
-        int lx, hx, ly, hy;
-        if (olivec_normalize_triangle(oc.width, oc.height, x1, y1, x2, y2, x3, y3, &lx, &hx, &ly, &hy)) {
-            for (int y = ly; y <= hy; ++y) {
-                for (int x = lx; x <= hx; ++x) {
-                    int u1, u2, det;
-                    if (olivec_barycentric(x1, y1, x2, y2, x3, y3, x, y, &u1, &u2, &det)) {
-                        int u3 = det - u1 - u2;
-                        float z = 1/v1.z*u1/det + 1/v2.z*u2/det + 1/v3.z*u3/det;
-                        float near_ = 0.1f;
-                        float far_ = 5.0f;
-                        if (1.0f/far_ < z && z < 1.0f/near_ && z > game->display_zbuffer[y*game->display_width + x]) {
-                            game->display_zbuffer[y*game->display_width + x] = z;
-                            OLIVEC_PIXEL(oc, x, y) = RGBA(0, 0, 255, 255);
-
-                            z = 1.0f/z;
-                            if (z >= 1.0) {
-                                z -= 1.0;
-                                uint32_t v = z*255;
-                                if (v > 255) v = 255;
-                                olivec_blend_color(&OLIVEC_PIXEL(oc, x, y), (v<<(3*8)));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    const int buffer_size = 64;
-    char buffer[buffer_size];
-    snprintf(buffer, buffer_size, "fps %.1f", game->current_fps);
-    olivec_text(oc, buffer, 0, 0, olivec_default_font, 3, RGBA(0, 0, 0, 255));
+    render_weird_gradient(game);
 
     arena_reset(&game->transient_arena);
 };
@@ -243,7 +136,7 @@ void game_key_down([[maybe_unused]] int key) {
 
 void game_generate_audio(Game* game) {
     // Clear audio buffer
-    memset(game->audio, 0, AUDIO_CAPACITY * sizeof(i16));
+    memset(game->audio, 0, AUDIO_CAPACITY * sizeof(int16));
     
     usize frames_needed = AUDIO_CAPACITY / game->audio_channels;
     
@@ -272,7 +165,7 @@ void game_generate_audio(Game* game) {
                     int mixed = (int)game->audio[dst_idx] + 
                                (int)(source->static_data.samples[src_idx] * source->volume);
                     
-                    game->audio[dst_idx] = (i16)CLAMP(mixed, -32768, 32767);
+                    game->audio[dst_idx] = (int16)CLAMP(mixed, -32768, 32767);
                 }
                 
                 source->static_data.current_position++;
@@ -313,21 +206,21 @@ void game_generate_audio(Game* game) {
                             int mixed = (int)game->audio[dst_idx] + 
                                        (int)(source->stream_data.stream_buffer[src_idx] * source->volume);
                             
-                            game->audio[dst_idx] = (i16)CLAMP(mixed, -32768, 32767);
+                            game->audio[dst_idx] = (int16)CLAMP(mixed, -32768, 32767);
                         }
                     } else {
                         // Need format conversion (implement as needed)
                         // For now, just handle simple cases
                         if (source->channels == 1 && game->audio_channels == 2) {
                             // Mono to stereo
-                            i16 mono_sample = (i16)(source->stream_data.stream_buffer[stream_frame_idx] * source->volume);
+                            int16 mono_sample = (int16)(source->stream_data.stream_buffer[stream_frame_idx] * source->volume);
                             usize dst_idx = output_frame_idx * 2;
                             
                             int mixed_l = (int)game->audio[dst_idx + 0] + mono_sample;
                             int mixed_r = (int)game->audio[dst_idx + 1] + mono_sample;
                             
-                            game->audio[dst_idx + 0] = (i16)CLAMP(mixed_l, -32768, 32767);
-                            game->audio[dst_idx + 1] = (i16)CLAMP(mixed_r, -32768, 32767);
+                            game->audio[dst_idx + 0] = (int16)CLAMP(mixed_l, -32768, 32767);
+                            game->audio[dst_idx + 1] = (int16)CLAMP(mixed_r, -32768, 32767);
                         }
                         // Add other conversions as needed
                     }
@@ -374,14 +267,14 @@ void game_free_audio_source(AudioSource* source) {
     
     if (source->type == AUDIO_SOURCE_STATIC) {
         // Note: Arena-allocated memory doesn't need explicit freeing
-        source->static_data.samples = nullptr;
+        source->static_data.samples = NULL;
     } else if (source->type == AUDIO_SOURCE_STREAMING) {
         if (source->stream_data.vorbis) {
             close_stream_source(source);
         }
         // Note: Arena-allocated memory doesn't need explicit freeing
-        source->stream_data.filename = nullptr;
-        source->stream_data.stream_buffer = nullptr;
+        source->stream_data.filename = NULL;
+        source->stream_data.stream_buffer = NULL;
     }
     
     memset(source, 0, sizeof(AudioSource));

@@ -15,7 +15,6 @@ void close_stream_source(AudioSource* source) {
     stb_vorbis_close(source->stream_data.vorbis);
 }
 
-// Fill the stream buffer when needed
 bool refill_stream_buffer(AudioSource* source) {
     if (source->type != AUDIO_SOURCE_STREAMING || !source->stream_data.vorbis) {
         return false;
@@ -48,9 +47,9 @@ bool refill_stream_buffer(AudioSource* source) {
     }
 }
 
-internal i16* resample_audio(
+internal int16* resample_audio(
     Arena* arena,
-    i16* input_samples,
+    int16* input_samples,
     usize input_frames,
     int input_channels,
     int input_rate,
@@ -65,18 +64,18 @@ internal i16* resample_audio(
     if (input_rate == target_rate) {
         *output_frames = input_frames;
         usize total_samples = input_frames * input_channels;
-        i16* output = arena_alloc(arena, total_samples * sizeof(i16));
-        memcpy(output, input_samples, total_samples * sizeof(i16));
+        int16* output = arena_alloc(arena, total_samples * sizeof(int16));
+        memcpy(output, input_samples, total_samples * sizeof(int16));
         return output;
     }
     
     // If input is 22kHz and target is 48kHz, ratio should be 48/22 = 2.18 (upsample)
     // If input is 48kHz and target is 22kHz, ratio should be 22/48 = 0.46 (downsample)
-    double ratio = (double)target_rate / (double)input_rate;
+    real64 ratio = (real64)target_rate / (real64)input_rate;
     *output_frames = (usize)(input_frames * ratio + 0.5); // Add 0.5 for rounding
     
     usize output_samples = *output_frames * input_channels;
-    i16* output = arena_alloc(arena, output_samples * sizeof(i16));
+    int16* output = arena_alloc(arena, output_samples * sizeof(int16));
     if (!output) {
         debug_print("Error: Transient arena out of memory for raw samples\n");
         return nullptr;
@@ -87,7 +86,7 @@ internal i16* resample_audio(
     for (usize i = 0; i < *output_frames; i++) {
         // For upsampling (ratio > 1): source advances slower than output
         // For downsampling (ratio < 1): source advances faster than output
-        double source_index = (double)i / ratio;
+        real64 source_index = (real64)i / ratio;
         usize index1 = (usize)source_index;
         usize index2 = index1 + 1;
         
@@ -95,15 +94,15 @@ internal i16* resample_audio(
         if (index1 >= input_frames) index1 = input_frames - 1;
         if (index2 >= input_frames) index2 = input_frames - 1;
         
-        double fraction = source_index - (double)index1;
+        real64 fraction = source_index - (real64)index1;
         
         for (int ch = 0; ch < input_channels; ch++) {
-            i16 sample1 = input_samples[index1 * input_channels + ch];
-            i16 sample2 = input_samples[index2 * input_channels + ch];
+            int16 sample1 = input_samples[index1 * input_channels + ch];
+            int16 sample2 = input_samples[index2 * input_channels + ch];
             
             // Linear interpolation
-            double interpolated_d = (double)sample1 + fraction * ((double)sample2 - (double)sample1);
-            i16 interpolated = (i16)CLAMP(interpolated_d, -32768.0, 32767.0);
+            real64 interpolated_d = (real64)sample1 + fraction * ((real64)sample2 - (real64)sample1);
+            int16 interpolated = (int16)CLAMP(interpolated_d, -32768.0, 32767.0);
             
             output[i * input_channels + ch] = interpolated;
         }
@@ -114,23 +113,23 @@ internal i16* resample_audio(
 
 // Channel conversion helper
 internal void convert_channels(
-    i16* input,
+    int16* input,
     int input_channels,
-    i16* output,
+    int16* output,
     int output_channels,
     usize frames
 ) {
     for (usize frame = 0; frame < frames; frame++) {
         if (input_channels == 1 && output_channels == 2) {
             // Mono to stereo
-            i16 mono = input[frame];
+            int16 mono = input[frame];
             output[frame * 2 + 0] = mono;
             output[frame * 2 + 1] = mono;
         } else if (input_channels == 2 && output_channels == 1) {
             // Stereo to mono
-            i16 left = input[frame * 2 + 0];
-            i16 right = input[frame * 2 + 1];
-            output[frame] = (i16)((left + right) / 2);
+            int16 left = input[frame * 2 + 0];
+            int16 right = input[frame * 2 + 1];
+            output[frame] = (int16)((left + right) / 2);
         } else {
             // Direct copy or take first available channels
             for (int ch = 0; ch < output_channels; ch++) {
@@ -167,7 +166,7 @@ AudioSource* load_ogg_static(
     
     // Decode entire file into transient memory first
     usize total_input_samples = total_frames * info.channels;
-    i16* raw_samples = arena_alloc(&game->transient_arena, total_input_samples * sizeof(i16));
+    int16* raw_samples = arena_alloc(&game->transient_arena, total_input_samples * sizeof(int16));
     if (!raw_samples) {
         debug_print("Error: Transient arena out of memory for raw samples\n");
         stb_vorbis_close(vorbis);
@@ -187,7 +186,7 @@ AudioSource* load_ogg_static(
     debug_print("  Decoded %d frames successfully\n", decoded_frames);
     
     // Step 1: Handle sample rate conversion
-    i16* resampled_audio = nullptr;
+    int16* resampled_audio = nullptr;
     usize resampled_frames = 0;
     
     if (info.sample_rate != (usize)game->audio_sample_rate) {
@@ -207,14 +206,14 @@ AudioSource* load_ogg_static(
     }
     
     // Step 2: Handle channel conversion
-    i16* final_audio = nullptr;
+    int16* final_audio = nullptr;
     usize final_frames = resampled_frames;
     
     if (info.channels != (int)game->audio_channels) {
         debug_print("  Converting channels: %d -> %zu\n", info.channels, game->audio_channels);
         
         usize final_samples = final_frames * game->audio_channels;
-        final_audio = arena_alloc(&game->transient_arena, final_samples * sizeof(i16));
+        final_audio = arena_alloc(&game->transient_arena, final_samples * sizeof(int16));
         if (!final_audio) {
             debug_print("Error: Arena out of memory for final audio\n");
             stb_vorbis_close(vorbis);
@@ -238,13 +237,13 @@ AudioSource* load_ogg_static(
 
     // Now copy final audio data to permanent storage
     usize permanent_sample_count = final_frames * game->audio_channels;
-    i16* permanent_samples = arena_alloc(&game->permanent_arena, permanent_sample_count * sizeof(i16));
+    int16* permanent_samples = arena_alloc(&game->permanent_arena, permanent_sample_count * sizeof(int16));
     if (!permanent_samples) {
         debug_print("Error: Permanent arena out of memory for audio data\n");
         stb_vorbis_close(vorbis);
         return nullptr;
     }
-    memcpy(permanent_samples, final_audio, permanent_sample_count * sizeof(i16));
+    memcpy(permanent_samples, final_audio, permanent_sample_count * sizeof(int16));
     
     // Find empty slot
     AudioSource* source = nullptr;
@@ -290,7 +289,7 @@ AudioSource* load_ogg_static(
 
 AudioSource* load_ogg_static_from_memory(
     Game* game,
-    const u8* data,
+    const uint8* data,
     usize data_size,
     bool loop
 ) {
@@ -317,9 +316,9 @@ AudioSource* load_ogg_static_from_memory(
 
     // Decode entire file
     usize total_input_samples = total_frames * info.channels;
-    i16* raw_samples = arena_alloc(
+    int16* raw_samples = arena_alloc(
         &game->transient_arena,
-        total_input_samples * sizeof(i16)
+        total_input_samples * sizeof(int16)
     );
     if (!raw_samples) {
         debug_print("Error: Out of memory allocating raw samples\n");
@@ -344,7 +343,7 @@ AudioSource* load_ogg_static_from_memory(
     debug_print("  Decoded %d frames successfully\n", decoded_frames);
 
     // Step 1: Handle sample rate conversion
-    i16* resampled_audio = nullptr;
+    int16* resampled_audio = nullptr;
     usize resampled_frames = 0;
 
     if (info.sample_rate != (usize)game->audio_sample_rate) {
@@ -369,7 +368,7 @@ AudioSource* load_ogg_static_from_memory(
     }
 
     // Step 2: Handle channel conversion
-    i16* final_audio = nullptr;
+    int16* final_audio = nullptr;
     usize final_frames = resampled_frames;
 
     if (info.channels != (int)game->audio_channels) {
@@ -378,7 +377,7 @@ AudioSource* load_ogg_static_from_memory(
         usize final_samples = final_frames * game->audio_channels;
         final_audio = arena_alloc(
             &game->transient_arena,
-            final_samples * sizeof(i16)
+            final_samples * sizeof(int16)
         );
         if (!final_audio) {
             debug_print("Error: Transient arena out of memory for final audio\n");
@@ -425,16 +424,16 @@ AudioSource* load_ogg_static_from_memory(
 
     // Now copy final audio data to permanent storage
     usize permanent_sample_count = final_frames * game->audio_channels;
-    i16* permanent_samples = arena_alloc(
+    int16* permanent_samples = arena_alloc(
         &game->permanent_arena,
-        permanent_sample_count * sizeof(i16)
+        permanent_sample_count * sizeof(int16)
     );
     if (!permanent_samples) {
         debug_print("Error: Permanent arena out of memory for audio data\n");
         stb_vorbis_close(vorbis);
         return nullptr;
     }
-    memcpy(permanent_samples, final_audio, permanent_sample_count * sizeof(i16));
+    memcpy(permanent_samples, final_audio, permanent_sample_count * sizeof(int16));
 
     // Initialize static audio source - CRITICAL: Zero the entire structure first
     memset(source, 0, sizeof(AudioSource));
@@ -522,7 +521,7 @@ AudioSource* load_ogg_streaming(
     source->stream_data.buffer_frames = stream_buffer_frames;
     source->stream_data.stream_buffer = arena_alloc(
         &game->permanent_arena,
-        stream_buffer_frames * info.channels * sizeof(i16)
+        stream_buffer_frames * info.channels * sizeof(int16)
     );
     if (!source->stream_data.stream_buffer) {
         debug_print("Error: Failed to allocate stream_buffer for streaming ogg\n");

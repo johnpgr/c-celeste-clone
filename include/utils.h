@@ -13,18 +13,18 @@
 
 #define NANOS_PER_SEC (1000*1000*1000)
 
-static inline u64 current_time_nanos(void) {
+static inline uint64 current_time_nanos(void) {
 #ifdef _WIN32
     LARGE_INTEGER Time;
     QueryPerformanceCounter(&Time);
 
-    static LARGE_INTEGER Frequency = {0};
+    static LARGE_INTEGER Frequency = {};
     if (Frequency.QuadPart == 0) {
         QueryPerformanceFrequency(&Frequency);
     }
 
-    uint64_t Secs  = Time.QuadPart / Frequency.QuadPart;
-    uint64_t Nanos = Time.QuadPart % Frequency.QuadPart * NANOS_PER_SEC / Frequency.QuadPart;
+    uint64 Secs  = Time.QuadPart / Frequency.QuadPart;
+    uint64 Nanos = Time.QuadPart % Frequency.QuadPart * NANOS_PER_SEC / Frequency.QuadPart;
     return NANOS_PER_SEC * Secs + Nanos;
 #else
     struct timespec ts;
@@ -34,7 +34,7 @@ static inline u64 current_time_nanos(void) {
 #endif // _WIN32
 }
 
-static inline void sleep_nanos(u64 nanos) {
+static inline void sleep_nanos(uint64 nanos) {
 #ifdef _WIN32
     Sleep((nanos + 999999) / 1000000);
 #else

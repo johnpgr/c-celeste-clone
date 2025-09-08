@@ -16,11 +16,11 @@ typedef struct {
     int sample_rate;
     bool is_playing;
     bool loop;
-    float volume;           // Per-source volume control
+    real32 volume;           // Per-source volume control
     
     // Static audio (fully loaded)
     struct {
-        i16* samples;
+        int16* samples;
         usize sample_count;
         usize frame_count;
         usize current_position;
@@ -30,11 +30,10 @@ typedef struct {
     struct {
         stb_vorbis* vorbis;
         char* filename;         // Keep filename for reopening when looping
-        i16* stream_buffer;     // Small buffer for streaming chunks
+        int16* stream_buffer;     // Small buffer for streaming chunks
         usize buffer_frames;    // Size of stream buffer in frames
         usize buffer_position;  // Current position in stream buffer
         usize buffer_valid;     // How many frames in buffer are valid
         bool end_of_file;       // Have we reached EOF?
     } stream_data;
 } AudioSource;
-

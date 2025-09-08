@@ -185,7 +185,7 @@ void window_init(Game* game) {
     debug_print("  Window class registered successfully\n");
 
     // Create the window
-    DWORD dwStyle = WS_OVERLAPPEDWINDOW;
+    DWORD dwStyle = WS_OVERLAPPEDWINDOW ^ WS_THICKFRAME ^ WS_MAXIMIZEBOX;
     RECT rect = { 0, 0, g_window_state.game->display_width, g_window_state.game->display_height };
     AdjustWindowRect(&rect, dwStyle, FALSE);
     
@@ -356,12 +356,15 @@ void window_set_size(int width, int height) {
  */
 void window_set_resizable(bool resizable) {
     if (!g_window_state.h_wnd) return;
+    g_window_state.is_resizable = resizable;
     
     DWORD dwStyle = GetWindowLong(g_window_state.h_wnd, GWL_STYLE);
     if (resizable) {
         dwStyle |= WS_THICKFRAME;
+        dwStyle |= WS_MAXIMIZEBOX;
     } else {
         dwStyle &= ~WS_THICKFRAME;
+        dwStyle &= ~WS_MAXIMIZEBOX;
     }
     
     SetWindowLong(g_window_state.h_wnd, GWL_STYLE, dwStyle);

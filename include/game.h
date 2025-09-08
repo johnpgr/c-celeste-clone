@@ -1,7 +1,22 @@
 #pragma once
 
-#include "arena.h"
+/**
+ * TODO:
+ * - Save game locations
+ * - Getting a handle to our executable file
+ * - Asset loading path
+ * - Threading (launch a thread)
+ * - Raw input (Support for multiple keyboard)
+ * - Sleep/timeBeginPeriod
+ * - ClipCursor() (For multi monitor support)
+ * - Fullscreen support
+ * - WM_SETCURSOR (control cursor visibility)
+ * - QueryCancelAutoplay
+ * - WM_ACTIVATEAPP (for when we are not the main application)
+*/
+
 #include "def.h"
+#include "arena.h"
 #include "audio-source.h"
 
 #define TITLE "The game"
@@ -14,35 +29,37 @@
 #define AUDIO_CHANNELS 2
 #define AUDIO_CAPACITY ((AUDIO_SAMPLE_RATE / FPS) * AUDIO_CHANNELS)
 
-static_assert(AUDIO_SAMPLE_RATE % FPS == 0);
+static_assert(AUDIO_SAMPLE_RATE % FPS == 0, "Audio sample rate must be divisible by fps");
 
 typedef struct {
     char* title;
     usize fps;
 
     bool frame_skip;
-    u64 frame_count;
-    u64 fps_timer_start;
-    double current_fps;
+    uint64 frame_count;
+    uint64 fps_timer_start;
+    real64 current_fps;
 
     Arena permanent_arena;
     Arena transient_arena;
 
-    u32* display;
-    f32* display_zbuffer;
+    uint32* display;
     usize display_capacity;
     usize display_width;
     usize display_height;
 
-    i16* audio;
+    int16* audio;
     usize audio_capacity;
     usize audio_sample_rate;
     usize audio_channels;
-    f32 audio_volume;
+    real32 audio_volume;
     
     AudioSource* audio_sources;
     usize audio_sources_capacity;
     usize audio_sources_size;
+
+    uint32 blue_offset;
+    uint32 green_offset;
 } Game;
 
 Game game_init(void);
@@ -54,6 +71,6 @@ void game_key_down(int key);
 // Audio loading functions
 void game_play_audio_source(AudioSource* source);
 void game_stop_audio_source(AudioSource* source);
-void game_set_audio_volume(AudioSource* source, float volume);
+void game_set_audio_volume(AudioSource* source, real32 volume);
 void game_free_audio_source(AudioSource* source);
 void game_generate_audio(Game* game);

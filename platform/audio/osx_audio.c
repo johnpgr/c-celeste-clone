@@ -4,7 +4,7 @@
 #include <pthread.h>
 
 typedef struct {
-    i16* data;
+    int16* data;
     usize capacity;
     usize write_pos;
     usize read_pos;
@@ -22,7 +22,7 @@ internal struct {
 
 internal void ring_buffer_init(RingBuffer* rb, usize capacity) {
     // TODO: Handle allocations with our own allocator
-    rb->data = calloc(capacity, sizeof(i16));
+    rb->data = calloc(capacity, sizeof(int16));
     rb->capacity = capacity;
     rb->write_pos = 0;
     rb->read_pos = 0;
@@ -36,7 +36,7 @@ internal void ring_buffer_destroy(RingBuffer* rb) {
     rb->data = nullptr;
 }
 
-internal usize ring_buffer_write(RingBuffer* rb, const i16* data, usize samples) {
+internal usize ring_buffer_write(RingBuffer* rb, const int16* data, usize samples) {
     pthread_mutex_lock(&rb->mutex);
     
     usize space_available = rb->capacity - rb->available;
@@ -53,7 +53,7 @@ internal usize ring_buffer_write(RingBuffer* rb, const i16* data, usize samples)
     return samples_to_write;
 }
 
-internal usize ring_buffer_read(RingBuffer* rb, i16* data, usize samples) {
+internal usize ring_buffer_read(RingBuffer* rb, int16* data, usize samples) {
     pthread_mutex_lock(&rb->mutex);
     
     usize samples_to_read = (samples < rb->available) ? samples : rb->available;
@@ -78,26 +78,26 @@ internal void audio_callback(void* user_data, AudioQueueRef aq, AudioQueueBuffer
         return;
     }
 
-    i16* audio_data = (i16*)buffer->mAudioData;
-    u32 frames_needed = game->audio_sample_rate / game->fps;
-    u32 total_samples = frames_needed * game->audio_channels;
-    u32 buffer_size = total_samples * sizeof(i16);
+    int16* audio_data = (int16*)buffer->mAudioData;
+    uint32 frames_needed = game->audio_sample_rate / game->fps;
+    uint32 total_samples = frames_needed * game->audio_channels;
+    uint32 buffer_size = total_samples * sizeof(int16);
     
     if (buffer_size > buffer->mAudioDataBytesCapacity) {
         buffer_size = buffer->mAudioDataBytesCapacity;
-        total_samples = buffer_size / sizeof(i16);
+        total_samples = buffer_size / sizeof(int16);
         frames_needed = total_samples / game->audio_channels;
     }
 
     usize samples_read = ring_buffer_read(&global_audio_state.ring_buffer, audio_data, total_samples);
     
     if (samples_read < total_samples) {
-        memset(audio_data + samples_read, 0, (total_samples - samples_read) * sizeof(i16));
+        memset(audio_data + samples_read, 0, (total_samples - samples_read) * sizeof(int16));
     }
     
     if (game->audio_volume != 1.0f) {
-        for (u32 i = 0; i < samples_read; i++) {
-            audio_data[i] = (i16)((float)audio_data[i] * game->audio_volume);
+        for (uint32 i = 0; i < samples_read; i++) {
+            audio_data[i] = (int16)((real32)audio_data[i] * game->audio_volume);
         }
     }
 
@@ -119,9 +119,9 @@ void audio_init(Game* game) {
         .mFormatFlags      = kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked,
         .mFramesPerPacket  = 1,
         .mChannelsPerFrame = game->audio_channels,
-        .mBitsPerChannel   = sizeof(i16) * 8,
-        .mBytesPerPacket   = game->audio_channels * sizeof(i16),
-        .mBytesPerFrame    = game->audio_channels * sizeof(i16),
+        .mBitsPerChannel   = sizeof(int16) * 8,
+        .mBytesPerPacket   = game->audio_channels * sizeof(int16),
+        .mBytesPerFrame    = game->audio_channels * sizeof(int16),
     };
 
     OSStatus status = AudioQueueNewOutput(
@@ -139,7 +139,7 @@ void audio_init(Game* game) {
         return;
     }
 
-    u32 buffer_size = game->audio_channels * (game->audio_sample_rate / game->fps) * sizeof(i16);
+    uint32 buffer_size = game->audio_channels * (game->audio_sample_rate / game->fps) * sizeof(int16);
     for (int i = 0; i < NUM_BUFFERS; i++) {
         status = AudioQueueAllocateBuffer(global_audio_state.queue, buffer_size, &global_audio_state.buffers[i]);
         if (status == noErr) {
@@ -178,7 +178,7 @@ void audio_update_buffer(Game* game) {
     }
 }
 
-void audio_set_volume(float volume) {
+void audio_set_volume(real32 volume) {
     if (volume < 0.0f) volume = 0.0f;
     if (volume > 1.0f) volume = 1.0f;
     global_audio_state.game->audio_volume = volume;

@@ -3,7 +3,6 @@ EXTERNAL_DIR := external
 ASSETS_DIR := assets
 BUILD_DIR := build
 PLATFORM_DIR := platform
-MAIN := core/main.c
 
 # Detect platform
 UNAME_S := $(shell uname -s)
@@ -18,7 +17,7 @@ else
 endif
 
 CC := clang
-CFLAGS := -std=c23 -g -O3 -march=native -Wall -Wextra -Wno-unused-variable -Wno-unused-function
+CFLAGS := -g -std=c23 -Wall -Wextra -Wno-unused-variable -Wno-unused-function
 
 # Compiler settings based on platform
 ifeq ($(PLATFORM), osx)
@@ -27,7 +26,7 @@ else ifeq ($(PLATFORM), linux)
     LDLIBS := -lX11 -lXext -lm -lpulse -lpulse-simple
 else ifeq ($(PLATFORM), win32)
     LDLIBS := -lgdi32 -luser32 -lkernel32 -ldsound
-    # LDFLAGS := -Wl,/SUBSYSTEM:WINDOWS
+    LDFLAGS := -Wl,/SUBSYSTEM:WINDOWS
     TARGET_SUFFIX := .exe
 endif
 
@@ -36,8 +35,8 @@ CFLAGS += -I$(INCLUDE_DIR) -I$(EXTERNAL_DIR) -I$(ASSETS_DIR)
 # Our flags
 CFLAGS += -DDEBUG_MODE=1
 
-# Core source files
-CORE_SRC := $(wildcard core/*.c)
+# Source files
+MAIN_SRC := $(wildcard src/*.c)
 EXTERNAL_SRC := external/olive.c
 
 # Platform-specific sources
@@ -50,7 +49,7 @@ else ifeq ($(PLATFORM), win32)
     PLATFORM_SRC := $(wildcard $(PLATFORM_DIR)/*/win32_*.c)
 endif
 
-SRC := $(MAIN) $(CORE_SRC) $(EXTERNAL_SRC) $(PLATFORM_SRC)
+SRC := $(MAIN_SRC) $(EXTERNAL_SRC) $(PLATFORM_SRC)
 
 # Target
 TARGET := build/software-rendering-c$(TARGET_SUFFIX)

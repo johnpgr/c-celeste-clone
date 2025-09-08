@@ -26,4 +26,4 @@ void audio_update_buffer(Game* game);
  * @brief Sets the master volume for audio playback.
  * @param volume Volume level (0.0 to 1.0)
  */
-void audio_set_volume(float volume);
+void audio_set_volume(real32 volume);

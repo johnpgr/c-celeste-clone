@@ -75,8 +75,8 @@ bool window_get_key_state(WindowKey key);
 
 /**
  * @brief Get the current mouse position
- * @param x Pointer to store the X coordinate (can be NULL)
- * @param y Pointer to store the Y coordinate (can be NULL)
+ * @param x Pointer to store the X coordinate (can be nullptr)
+ * @param y Pointer to store the Y coordinate (can be nullptr)
  */
 void window_get_mouse_position(int* x, int* y);
 
@@ -95,8 +95,8 @@ void window_set_title(const char* title);
 
 /**
  * @brief Get the current window size
- * @param width Pointer to store the width (can be NULL)
- * @param height Pointer to store the height (can be NULL)
+ * @param width Pointer to store the width (can be nullptr)
+ * @param height Pointer to store the height (can be nullptr)
  */
 void window_get_size(int* width, int* height);
 

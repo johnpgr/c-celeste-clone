@@ -12,19 +12,19 @@
 
 #define internal static
 
-#define i8 int8_t
-#define i16 int16_t
-#define i32 int32_t
-#define i64 int64_t
+#define int8 int8_t
+#define int16 int16_t
+#define int32 int32_t
+#define int64 int64_t
 
-#define u8 uint8_t
-#define u16 uint16_t
-#define u32 uint32_t
-#define u64 uint64_t
+#define uint8 uint8_t
+#define uint16 uint16_t
+#define uint32 uint32_t
+#define uint64 uint64_t
 #define usize size_t
 
-#define f32 float
-#define f64 double
+#define real32 float
+#define real64 double
 
 #define PI 3.14159265358979323846
 #define EPSILON 1e-6
@@ -59,11 +59,6 @@
  * @return 32-bit pixel value ready for direct use in framebuffers
  */
 #define RGBA(r, g, b, a) ((((b)&0xFF)<<(8*0)) | (((g)&0xFF)<<(8*1)) | (((r)&0xFF)<<(8*2)) | (((a)&0xFF)<<(8*3)))
-
-inline u32 trunc_u64(u64 val) {
-    assert(val <= 0xFFFFFFFF && "u64 value bigger than max possible u32");
-    return (u32)val;
-}
 
 void debug_print(const char* format, ...);
 

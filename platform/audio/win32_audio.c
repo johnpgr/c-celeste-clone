@@ -4,7 +4,7 @@
 #include "game.h"
 
 typedef struct {
-    i16* data;
+    int16* data;
     usize capacity;
     usize write_pos;
     usize read_pos;
@@ -22,18 +22,18 @@ internal struct {
     HANDLE audio_event;
     bool initialized;
     bool should_stop;
-    u32 buffer_size;
-    u32 samples_per_buffer;
+    uint32 buffer_size;
+    uint32 samples_per_buffer;
 
     // Streaming/latency control
-    u32 block_align;        // bytes per frame (all channels)
-    u32 block_bytes;        // one "tick" worth in bytes (1/fps seconds)
-    u32 safety_bytes;       // how far ahead of the play cursor we keep filled
-    u32 running_write_pos;  // next byte offset to write into secondary buffer
+    uint32 block_align;        // bytes per frame (all channels)
+    uint32 block_bytes;        // one "tick" worth in bytes (1/fps seconds)
+    uint32 safety_bytes;       // how far ahead of the play cursor we keep filled
+    uint32 running_write_pos;  // next byte offset to write into secondary buffer
 } global_audio_state;
 
 internal void ring_buffer_init(RingBuffer* rb, usize capacity) {
-    rb->data = calloc(capacity, sizeof(i16));
+    rb->data = calloc(capacity, sizeof(int16));
     rb->capacity = capacity;
     rb->write_pos = 0;
     rb->read_pos = 0;
@@ -47,7 +47,7 @@ internal void ring_buffer_destroy(RingBuffer* rb) {
     rb->data = nullptr;
 }
 
-internal usize ring_buffer_write(RingBuffer* rb, const i16* data, usize samples) {
+internal usize ring_buffer_write(RingBuffer* rb, const int16* data, usize samples) {
     EnterCriticalSection(&rb->mutex);
     
     usize space_available = rb->capacity - rb->available;
@@ -64,7 +64,7 @@ internal usize ring_buffer_write(RingBuffer* rb, const i16* data, usize samples)
     return samples_to_write;
 }
 
-internal usize ring_buffer_read(RingBuffer* rb, i16* data, usize samples) {
+internal usize ring_buffer_read(RingBuffer* rb, int16* data, usize samples) {
     EnterCriticalSection(&rb->mutex);
     
     usize samples_to_read = (samples < rb->available) ? samples : rb->available;
@@ -98,14 +98,14 @@ internal DWORD WINAPI audio_thread_proc(LPVOID param) {
             continue;
         }
 
-        const u32 buffer_size = global_audio_state.buffer_size;
-        const u32 block_align = global_audio_state.block_align;
-        const u32 safety_bytes = global_audio_state.safety_bytes;
+        const uint32 buffer_size = global_audio_state.buffer_size;
+        const uint32 block_align = global_audio_state.block_align;
+        const uint32 safety_bytes = global_audio_state.safety_bytes;
 
-        u32 target_write_pos = (play_pos + safety_bytes) % buffer_size;
-        u32 running_write_pos = global_audio_state.running_write_pos;
+        uint32 target_write_pos = (play_pos + safety_bytes) % buffer_size;
+        uint32 running_write_pos = global_audio_state.running_write_pos;
 
-        u32 bytes_to_write = (target_write_pos + buffer_size - running_write_pos) % buffer_size;
+        uint32 bytes_to_write = (target_write_pos + buffer_size - running_write_pos) % buffer_size;
         // Align to frame boundary
         bytes_to_write -= bytes_to_write % block_align;
 
@@ -113,7 +113,7 @@ internal DWORD WINAPI audio_thread_proc(LPVOID param) {
             continue;
         }
 
-        LPVOID audio_ptr1 = NULL, audio_ptr2 = NULL;
+        LPVOID audio_ptr1 = nullptr, audio_ptr2 = nullptr;
         DWORD audio_bytes1 = 0, audio_bytes2 = 0;
 
         hr = IDirectSoundBuffer_Lock(
@@ -129,8 +129,8 @@ internal DWORD WINAPI audio_thread_proc(LPVOID param) {
         }
 
         if (audio_ptr1 && audio_bytes1 > 0) {
-            i16* audio_data = (i16*)audio_ptr1;
-            u32 samples_in_region1 = audio_bytes1 / sizeof(i16);
+            int16* audio_data = (int16*)audio_ptr1;
+            uint32 samples_in_region1 = audio_bytes1 / sizeof(int16);
 
             usize samples_read = ring_buffer_read(
                 &global_audio_state.ring_buffer,
@@ -140,19 +140,19 @@ internal DWORD WINAPI audio_thread_proc(LPVOID param) {
 
             if (samples_read < samples_in_region1) {
                 memset(audio_data + samples_read, 0,
-                       (samples_in_region1 - samples_read) * sizeof(i16));
+                       (samples_in_region1 - samples_read) * sizeof(int16));
             }
 
             if (game->audio_volume != 1.0f && samples_read > 0) {
-                for (u32 i = 0; i < samples_read; i++) {
-                    audio_data[i] = (i16)((float)audio_data[i] * game->audio_volume);
+                for (uint32 i = 0; i < samples_read; i++) {
+                    audio_data[i] = (int16)((real32)audio_data[i] * game->audio_volume);
                 }
             }
         }
 
         if (audio_ptr2 && audio_bytes2 > 0) {
-            i16* audio_data = (i16*)audio_ptr2;
-            u32 samples_in_region2 = audio_bytes2 / sizeof(i16);
+            int16* audio_data = (int16*)audio_ptr2;
+            uint32 samples_in_region2 = audio_bytes2 / sizeof(int16);
 
             usize samples_read = ring_buffer_read(
                 &global_audio_state.ring_buffer,
@@ -162,12 +162,12 @@ internal DWORD WINAPI audio_thread_proc(LPVOID param) {
 
             if (samples_read < samples_in_region2) {
                 memset(audio_data + samples_read, 0,
-                       (samples_in_region2 - samples_read) * sizeof(i16));
+                       (samples_in_region2 - samples_read) * sizeof(int16));
             }
 
             if (game->audio_volume != 1.0f && samples_read > 0) {
-                for (u32 i = 0; i < samples_read; i++) {
-                    audio_data[i] = (i16)((float)audio_data[i] * game->audio_volume);
+                for (uint32 i = 0; i < samples_read; i++) {
+                    audio_data[i] = (int16)((real32)audio_data[i] * game->audio_volume);
                 }
             }
         }
@@ -195,19 +195,19 @@ void audio_init(Game* game) {
     
     HRESULT hr = DirectSoundCreate(nullptr, &global_audio_state.dsound, nullptr);
     if (FAILED(hr)) {
-        debug_print("Error: Could not create DirectSound object (hr: 0x%08X)\n", (u32)hr);
+        debug_print("Error: Could not create DirectSound object (hr: 0x%08X)\n", (uint32)hr);
         return;
     }
     
     HWND hwnd = GetDesktopWindow();
     hr = IDirectSound_SetCooperativeLevel(global_audio_state.dsound, hwnd, DSSCL_PRIORITY);
     if (FAILED(hr)) {
-        debug_print("Error: Could not set DirectSound cooperative level (hr: 0x%08X)\n", (u32)hr);
+        debug_print("Error: Could not set DirectSound cooperative level (hr: 0x%08X)\n", (uint32)hr);
         IDirectSound_Release(global_audio_state.dsound);
         return;
     }
     
-    DSBUFFERDESC primary_desc = {0};
+    DSBUFFERDESC primary_desc = {};
     primary_desc.dwSize = sizeof(DSBUFFERDESC);
     primary_desc.dwFlags = DSBCAPS_PRIMARYBUFFER;
     
@@ -219,31 +219,31 @@ void audio_init(Game* game) {
     );
     
     if (FAILED(hr)) {
-        debug_print("Error: Could not create primary buffer (hr: 0x%08X)\n", (u32)hr);
+        debug_print("Error: Could not create primary buffer (hr: 0x%08X)\n", (uint32)hr);
         IDirectSound_Release(global_audio_state.dsound);
         return;
     }
     
-    WAVEFORMATEX wave_format = {0};
+    WAVEFORMATEX wave_format = {};
     wave_format.wFormatTag = WAVE_FORMAT_PCM;
     wave_format.nChannels = (WORD)game->audio_channels;
     wave_format.nSamplesPerSec = (DWORD)game->audio_sample_rate;
-    wave_format.wBitsPerSample = sizeof(i16) * 8;
-    wave_format.nBlockAlign = (WORD)(game->audio_channels * sizeof(i16));
+    wave_format.wBitsPerSample = sizeof(int16) * 8;
+    wave_format.nBlockAlign = (WORD)(game->audio_channels * sizeof(int16));
     wave_format.nAvgBytesPerSec = wave_format.nSamplesPerSec * wave_format.nBlockAlign;
     
     hr = IDirectSoundBuffer_SetFormat(global_audio_state.primary_buffer, &wave_format);
     if (FAILED(hr)) {
-        debug_print("Error: Could not set primary buffer format (hr: 0x%08X)\n", (u32)hr);
+        debug_print("Error: Could not set primary buffer format (hr: 0x%08X)\n", (uint32)hr);
     }
 
     // Derived sizes for latency and buffer management
     global_audio_state.block_align = wave_format.nBlockAlign;
-    global_audio_state.block_bytes = (u32)((game->audio_sample_rate / game->fps) * wave_format.nBlockAlign);
+    global_audio_state.block_bytes = (uint32)((game->audio_sample_rate / game->fps) * wave_format.nBlockAlign);
     global_audio_state.buffer_size = global_audio_state.block_bytes * NUM_BUFFERS;
-    global_audio_state.samples_per_buffer = global_audio_state.buffer_size / sizeof(i16);
+    global_audio_state.samples_per_buffer = global_audio_state.buffer_size / sizeof(int16);
     
-    DSBUFFERDESC secondary_desc = {0};
+    DSBUFFERDESC secondary_desc = {};
     secondary_desc.dwSize = sizeof(DSBUFFERDESC);
     secondary_desc.dwFlags = DSBCAPS_GETCURRENTPOSITION2 | DSBCAPS_GLOBALFOCUS;
     secondary_desc.dwBufferBytes = global_audio_state.buffer_size;
@@ -257,7 +257,7 @@ void audio_init(Game* game) {
     );
     
     if (FAILED(hr)) {
-        debug_print("Error: Could not create secondary buffer (hr: 0x%08X)\n", (u32)hr);
+        debug_print("Error: Could not create secondary buffer (hr: 0x%08X)\n", (uint32)hr);
         IDirectSoundBuffer_Release(global_audio_state.primary_buffer);
         IDirectSound_Release(global_audio_state.dsound);
         return;
@@ -294,7 +294,7 @@ void audio_init(Game* game) {
     );
     
     if (FAILED(hr)) {
-        debug_print("Error: Could not start playing secondary buffer (hr: 0x%08X)\n", (u32)hr);
+        debug_print("Error: Could not start playing secondary buffer (hr: 0x%08X)\n", (uint32)hr);
         IDirectSoundBuffer_Release(global_audio_state.secondary_buffer);
         IDirectSoundBuffer_Release(global_audio_state.primary_buffer);
         IDirectSound_Release(global_audio_state.dsound);
@@ -354,7 +354,7 @@ void audio_update_buffer(Game* game) {
     SetEvent(global_audio_state.audio_event);
 }
 
-void audio_set_volume(float volume) {
+void audio_set_volume(real32 volume) {
     if (volume < 0.0f) volume = 0.0f;
     if (volume > 1.0f) volume = 1.0f;
     global_audio_state.game->audio_volume = volume;

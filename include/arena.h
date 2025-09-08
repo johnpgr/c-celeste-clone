@@ -2,7 +2,7 @@
 #include "def.h"
 
 typedef struct {
-    u8* memory;
+    uint8* memory;
     usize size;
     usize offset;
     const char* name;

@@ -7,7 +7,7 @@
 #include <string.h>
 
 typedef struct {
-    i16* data;
+    int16* data;
     usize capacity;
     usize write_pos;
     usize read_pos;
@@ -22,13 +22,13 @@ internal struct {
     pthread_t audio_thread;
     bool initialized;
     bool should_stop;
-    u32 buffer_size;
-    u32 samples_per_buffer;
+    uint32 buffer_size;
+    uint32 samples_per_buffer;
 } global_audio_state;
 
 internal void ring_buffer_init(RingBuffer* rb, usize capacity) {
     // TODO: Handle allocations with our own allocator
-    rb->data = calloc(capacity, sizeof(i16));
+    rb->data = calloc(capacity, sizeof(int16));
     rb->capacity = capacity;
     rb->write_pos = 0;
     rb->read_pos = 0;
@@ -42,7 +42,7 @@ internal void ring_buffer_destroy(RingBuffer* rb) {
     rb->data = nullptr;
 }
 
-internal usize ring_buffer_write(RingBuffer* rb, const i16* data, usize samples) {
+internal usize ring_buffer_write(RingBuffer* rb, const int16* data, usize samples) {
     pthread_mutex_lock(&rb->mutex);
     
     usize space_available = rb->capacity - rb->available;
@@ -59,7 +59,7 @@ internal usize ring_buffer_write(RingBuffer* rb, const i16* data, usize samples)
     return samples_to_write;
 }
 
-internal usize ring_buffer_read(RingBuffer* rb, i16* data, usize samples) {
+internal usize ring_buffer_read(RingBuffer* rb, int16* data, usize samples) {
     pthread_mutex_lock(&rb->mutex);
     
     usize samples_to_read = (samples < rb->available) ? samples : rb->available;
@@ -79,11 +79,11 @@ internal void* audio_thread_proc(void* param) {
     Game* game = (Game*)param;
     
     // Calculate buffer size for one frame worth of audio
-    u32 frames_per_buffer = game->audio_sample_rate / game->fps;
-    u32 samples_per_buffer = frames_per_buffer * game->audio_channels;
-    u32 buffer_size = samples_per_buffer * sizeof(i16);
+    uint32 frames_per_buffer = game->audio_sample_rate / game->fps;
+    uint32 samples_per_buffer = frames_per_buffer * game->audio_channels;
+    uint32 buffer_size = samples_per_buffer * sizeof(int16);
     
-    i16* audio_buffer = malloc(buffer_size);
+    int16* audio_buffer = malloc(buffer_size);
     if (!audio_buffer) {
         debug_print("Error: Could not allocate audio buffer\n");
         return nullptr;
@@ -100,13 +100,13 @@ internal void* audio_thread_proc(void* param) {
         // Fill remaining buffer with silence if needed
         if (samples_read < samples_per_buffer) {
             memset(audio_buffer + samples_read, 0, 
-                   (samples_per_buffer - samples_read) * sizeof(i16));
+                   (samples_per_buffer - samples_read) * sizeof(int16));
         }
         
         // Apply volume
         if (game->audio_volume != 1.0f) {
-            for (u32 i = 0; i < samples_read; i++) {
-                audio_buffer[i] = (i16)((float)audio_buffer[i] * game->audio_volume);
+            for (uint32 i = 0; i < samples_read; i++) {
+                audio_buffer[i] = (int16)((real32)audio_buffer[i] * game->audio_volume);
             }
         }
         
@@ -169,8 +169,8 @@ void audio_init(Game* game) {
     
     // Calculate buffer sizes
     global_audio_state.buffer_size = game->audio_channels * 
-        (game->audio_sample_rate / game->fps) * sizeof(i16) * NUM_BUFFERS;
-    global_audio_state.samples_per_buffer = global_audio_state.buffer_size / sizeof(i16);
+        (game->audio_sample_rate / game->fps) * sizeof(int16) * NUM_BUFFERS;
+    global_audio_state.samples_per_buffer = global_audio_state.buffer_size / sizeof(int16);
     
     // Start audio thread
     global_audio_state.should_stop = false;
@@ -210,7 +210,7 @@ void audio_update_buffer(Game* game) {
     }
 }
 
-void audio_set_volume(float volume) {
+void audio_set_volume(real32 volume) {
     if (volume < 0.0f) volume = 0.0f;
     if (volume > 1.0f) volume = 1.0f;
     global_audio_state.game->audio_volume = volume;
