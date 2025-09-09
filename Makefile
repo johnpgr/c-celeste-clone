@@ -84,8 +84,8 @@ LDFLAGS += -fuse-ld=lld
 # ==============================================================================
 
 # Main application source files
-MAIN_SRC := $(wildcard src/*.c)
-
+# MAIN_SRC := $(wildcard src/*.c)
+MAIN_SRC := src/main.c
 
 # External library source files
 EXTERNAL_SRC := $(wildcard external/*.c)
@@ -108,8 +108,8 @@ SRC := $(MAIN_SRC) $(EXTERNAL_SRC) $(PLATFORM_SRC)
 # ==============================================================================
 
 # Convert source files to object file paths
-OBJ := $(patsubst %.c,$(OBJ_DIR)/%.o,$(filter %.c,$(SRC))) \
-       $(patsubst %.m,$(OBJ_DIR)/%.o,$(filter %.m,$(SRC)))
+OBJ := $(addprefix $(OBJ_DIR)/,$(notdir $(patsubst %.c,%.o,$(filter %.c,$(SRC))))) \
+       $(addprefix $(OBJ_DIR)/,$(notdir $(patsubst %.m,%.o,$(filter %.m,$(SRC)))))
 
 # Dependency files for incremental builds
 DEPS := $(OBJ:.o=.d)

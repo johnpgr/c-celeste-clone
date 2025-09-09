@@ -1,10 +1,17 @@
-#include <stdlib.h>
-#include "game.h"
-#include "gl_renderer.h"
+#ifdef _WIN32
+#define _CRT_SECURE_NO_WARNINGS
+#endif
+
+#include "arena.c"
+#include "assets.c"
+#include "game.c"
+#include "gl_renderer.c"
+#include "log.c"
+#include "ogg.c"
+#include "vector.c"
+
 #include "window.h"
 #include "audio.h"
-#include "utils.h"
-#include "ogg.h"
 
 inline void update_fps_counter(Game* game, uint64 current_time) {
     game->frame_count++;

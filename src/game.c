@@ -100,19 +100,16 @@ void game_key_down([[maybe_unused]] int key) {
 };
 
 void game_generate_audio(Game* game) {
-    // Clear audio buffer
     memset(game->audio, 0, AUDIO_CAPACITY * sizeof(int16));
     
     usize frames_needed = AUDIO_CAPACITY / game->audio_channels;
     
-    // Mix all active audio sources
     for (usize source_idx = 0; source_idx < game->audio_sources_capacity; source_idx++) {
         AudioSource* source = &game->audio_sources[source_idx];
         
         if (!source->is_playing) continue;
         
         if (source->type == AUDIO_SOURCE_STATIC) {
-            // Handle static audio (same as before)
             for (usize frame = 0; frame < frames_needed; frame++) {
                 if (source->static_data.current_position >= source->static_data.frame_count) {
                     if (source->loop) {
@@ -137,20 +134,16 @@ void game_generate_audio(Game* game) {
             }
             
         } else if (source->type == AUDIO_SOURCE_STREAMING) {
-            // Handle streaming audio
             usize frames_processed = 0;
             
             while (frames_processed < frames_needed && source->is_playing) {
-                // Check if we need to refill the stream buffer
                 if (source->stream_data.buffer_position >= source->stream_data.buffer_valid) {
                     if (!refill_stream_buffer(source)) {
-                        // End of stream and no loop, stop playing
                         source->is_playing = false;
                         break;
                     }
                 }
                 
-                // Process available frames from stream buffer
                 usize frames_available = source->stream_data.buffer_valid - source->stream_data.buffer_position;
                 usize frames_to_process = (frames_needed - frames_processed < frames_available) 
                                         ? frames_needed - frames_processed 
@@ -160,10 +153,8 @@ void game_generate_audio(Game* game) {
                     usize stream_frame_idx = source->stream_data.buffer_position + frame;
                     usize output_frame_idx = frames_processed + frame;
                     
-                    // Handle channel and sample rate conversion if needed
                     if (source->sample_rate == (int)game->audio_sample_rate && 
                         source->channels == (int)game->audio_channels) {
-                        // Direct copy (most common case)
                         for (usize ch = 0; ch < game->audio_channels; ch++) {
                             usize src_idx = stream_frame_idx * source->channels + ch;
                             usize dst_idx = output_frame_idx * game->audio_channels + ch;
@@ -174,10 +165,7 @@ void game_generate_audio(Game* game) {
                             game->audio[dst_idx] = (int16)CLAMP(mixed, -32768, 32767);
                         }
                     } else {
-                        // Need format conversion (implement as needed)
-                        // For now, just handle simple cases
                         if (source->channels == 1 && game->audio_channels == 2) {
-                            // Mono to stereo
                             int16 mono_sample = (int16)(source->stream_data.stream_buffer[stream_frame_idx] * source->volume);
                             usize dst_idx = output_frame_idx * 2;
                             
@@ -187,7 +175,6 @@ void game_generate_audio(Game* game) {
                             game->audio[dst_idx + 0] = (int16)CLAMP(mixed_l, -32768, 32767);
                             game->audio[dst_idx + 1] = (int16)CLAMP(mixed_r, -32768, 32767);
                         }
-                        // Add other conversions as needed
                     }
                 }
                 
