@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include "game.h"
-#include "gl-renderer.h"
+#include "gl_renderer.h"
 #include "window.h"
 #include "audio.h"
 #include "utils.h"
@@ -20,10 +20,9 @@ int main(int argc, [[maybe_unused]] char* argv[argc + 1]) {
     Game game = game_init();
 
     window_init(&game, 800, 600);
-    window_set_resizable(true);
-    gl_init();
-
+    window_set_vsync(false);
     audio_init(&game);
+    gl_init();
 
     static uint8 background_ogg_source[] = {
         #embed "assets/sounds/Background.ogg"
@@ -65,6 +64,8 @@ int main(int argc, [[maybe_unused]] char* argv[argc + 1]) {
     uint64 accumulator = 0;
     uint64 last_time = current_time_nanos();
 
+    window_show();
+
     // TODO: Separate render thread from main thread 
     // (for resizing, moving the window without stopping the render)
     // Audio thread is already separate
@@ -94,7 +95,8 @@ int main(int argc, [[maybe_unused]] char* argv[argc + 1]) {
         space_was_pressed = space_is_pressed;
 
         if (f_is_pressed && !f_was_pressed) {
-            game.frame_skip = !game.frame_skip;
+            game.fps_cap = !game.fps_cap;
+            debug_print("Frameskipping %s\n", game.fps_cap ? "Enabled" : "Disabled");
         }
         f_was_pressed = f_is_pressed;
 
@@ -113,20 +115,20 @@ int main(int argc, [[maybe_unused]] char* argv[argc + 1]) {
             game_generate_audio(&game);
             audio_update_buffer(&game);
             
-            if (game.frame_skip) {
+            if (game.fps_cap) {
                 update_fps_counter(&game, current_time);
                 game_update_and_render(&game);
-            }
+                window_present();
+            } 
             
             accumulator -= NANOS_PER_UPDATE;
         }
         
-        if (!game.frame_skip) {
+        if (!game.fps_cap) {
             update_fps_counter(&game, current_time);
             game_update_and_render(&game);
+            window_present();
         }
-
-        window_present();
     }
 
     game_cleanup(&game);

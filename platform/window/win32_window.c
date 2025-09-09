@@ -4,6 +4,8 @@
 #include "window.h"
 #include "glad/glad.h"
 
+typedef BOOL (WINAPI * PFNWGLSWAPINTERVALEXTPROC) (int interval);
+
 static struct {
     HWND hwnd;
     HDC hdc;
@@ -13,6 +15,7 @@ static struct {
     Game* game;
     bool should_close;
     bool is_resizable;
+    PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT;
 } WIN32Window;
 
 /**
@@ -24,6 +27,17 @@ static struct {
     int32 mouse_x, mouse_y;
 } WIN32Input;
 
+internal void init_vsync_extension() {
+    WIN32Window.wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC)wglGetProcAddress("wglSwapIntervalEXT");
+    
+    if (WIN32Window.wglSwapIntervalEXT) {
+        debug_print("  WGL_EXT_swap_control extension loaded\n");
+        WIN32Window.wglSwapIntervalEXT(0);
+        debug_print("  VSync disabled\n");
+    } else {
+        debug_print("  Warning: WGL_EXT_swap_control extension not available\n");
+    }
+}
 
 internal bool init_opengl_context() {
     debug_print("  Initializing OpenGL context.\n");
@@ -244,8 +258,9 @@ void window_init(Game* game, int32 width, int32 height) {
         return;
     }
 
-    // Show window
-    ShowWindow(WIN32Window.hwnd, SW_SHOWDEFAULT);
+    init_vsync_extension();
+
+    // ShowWindow(WIN32Window.hwnd, SW_SHOWDEFAULT);
     UpdateWindow(WIN32Window.hwnd);
     
     debug_print("Window system initialized successfully\n");
@@ -258,6 +273,18 @@ void window_present(void) {
     if (!WIN32Window.hwnd || !WIN32Window.hdc) return;
 
     SwapBuffers(WIN32Window.hdc);
+}
+
+/**
+ * @brief Show the window
+ */
+void window_show(void) {
+    if (!WIN32Window.hwnd) return;
+    
+    ShowWindow(WIN32Window.hwnd, SW_SHOWDEFAULT);
+    UpdateWindow(WIN32Window.hwnd);
+    SetForegroundWindow(WIN32Window.hwnd);
+    SetFocus(WIN32Window.hwnd);
 }
 
 /**
@@ -389,3 +416,12 @@ void window_set_resizable(bool resizable) {
     SetWindowLong(WIN32Window.hwnd, GWL_STYLE, dwStyle);
 }
 
+/**
+* @brief Set wheter the window has vsync
+*/
+void window_set_vsync(bool enable) {
+    if (WIN32Window.wglSwapIntervalEXT) {
+        WIN32Window.wglSwapIntervalEXT(enable ? 1 : 0);
+        debug_print("VSync %s\n", enable ? "enabled" : "disabled");
+    }
+}

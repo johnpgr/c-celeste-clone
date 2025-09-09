@@ -1,15 +1,5 @@
 #pragma once
-
 #include "game.h"
-
-/**
- * @file window.h
- * @brief Cross-platform window management for the software renderer
- * 
- * This module provides a platform-specific window implementation using Cocoa
- * on macOS. It creates a native window, handles the main event loop, and
- * displays the game's framebuffer using Core Graphics.
- */
 
 /**
  * @brief Key codes for input handling
@@ -114,6 +104,11 @@ void window_set_size(int width, int height);
 void window_set_resizable(bool resizable);
 
 /**
+ * @brief Set wheter the window has vsync
+ */
+void window_set_vsync(bool enable);
+
+/**
  * @brief Present the framebuffer to the screen
  * 
  * Forces an immediate redraw of the window content. Normally
@@ -121,3 +116,10 @@ void window_set_resizable(bool resizable);
  * manual control.
  */
 void window_present(void);
+
+/**
+ * @brief Show the window
+ * 
+ * Makes the window visible if it was previously hidden or minimized.
+ */
+void window_show(void);

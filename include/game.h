@@ -32,7 +32,7 @@ typedef struct {
     char* title;
     usize fps;
 
-    bool frame_skip;
+    bool fps_cap;
     uint64 frame_count;
     uint64 fps_timer_start;
     real64 current_fps;

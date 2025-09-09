@@ -1,4 +1,4 @@
-#include "gl-renderer.h"
+#include "gl_renderer.h"
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 

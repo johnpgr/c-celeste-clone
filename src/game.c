@@ -3,7 +3,7 @@
 #include "ogg.h"
 #include "utils.h"
 #include "vector.h"
-#include "gl-renderer.h"
+#include "gl_renderer.h"
 
 #define MAX_AUDIO_SOURCES 16
 #define STREAM_BUFFER_FRAMES 4096
@@ -45,7 +45,7 @@ Game game_init(void) {
     Game game = {
         .title                   = (char*)TITLE,
         .fps                     = FPS,
-        .frame_skip              = false,
+        .fps_cap                 = true,
         .frame_count             = 0,
         .fps_timer_start         = current_time_nanos(),
         .current_fps             = 0.0,
