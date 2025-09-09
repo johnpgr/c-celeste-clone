@@ -1,6 +1,8 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include "ogg.h"
 #include "game.h"
+
+#define STB_VORBIS_HEADER_ONLY
 #include "stb_vorbis.c"
 
 void start_stream_source(AudioSource* source) {
@@ -293,13 +295,18 @@ AudioSource* load_ogg_static_from_memory(
     usize data_size,
     bool loop
 ) {
+    if (data_size > INT_MAX) {
+        debug_print("Error: ogg size bigger than the maximum allowed in stb_vorbis\n");
+        return nullptr;
+    }
+
     if (game->audio_sources_size >= game->audio_sources_capacity) {
         debug_print("Error: Maximum audio sources reached\n");
         return nullptr;
     }
 
     int error = 0;
-    stb_vorbis* vorbis = stb_vorbis_open_memory((const unsigned char*)data, (int)data_size, &error, nullptr);
+    stb_vorbis* vorbis = stb_vorbis_open_memory(data, (int)data_size, &error, nullptr);
     if (!vorbis) {
         debug_print("Error: Could not open OGG data in memory (error: %d)\n", error);
         return nullptr;

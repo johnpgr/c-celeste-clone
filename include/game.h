@@ -22,9 +22,6 @@
 #define TITLE "The game"
 #define FPS 60
 #define DELTA_TIME (1.0f/FPS)
-#define DISPLAY_WIDTH 800
-#define DISPLAY_HEIGHT 600
-#define DISPLAY_CAPACITY (DISPLAY_WIDTH * DISPLAY_HEIGHT)
 #define AUDIO_SAMPLE_RATE 48000
 #define AUDIO_CHANNELS 2
 #define AUDIO_CAPACITY ((AUDIO_SAMPLE_RATE / FPS) * AUDIO_CHANNELS)
@@ -43,10 +40,8 @@ typedef struct {
     Arena permanent_arena;
     Arena transient_arena;
 
-    uint32* display;
-    usize display_capacity;
-    usize display_width;
-    usize display_height;
+    int32 window_width;
+    int32 window_height;
 
     int16* audio;
     usize audio_capacity;
@@ -57,9 +52,6 @@ typedef struct {
     AudioSource* audio_sources;
     usize audio_sources_capacity;
     usize audio_sources_size;
-
-    uint32 blue_offset;
-    uint32 green_offset;
 } Game;
 
 Game game_init(void);

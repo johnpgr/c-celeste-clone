@@ -36,29 +36,7 @@
 #define ARRAY_LEN(arr) (sizeof(arr) / sizeof((arr)[0]))
 #define CLAMP(val, lo, hi) ((val) < (lo) ? (lo) : ((val) > (hi) ? (hi) : (val)))
 
-/**
- * @brief Creates a 32-bit RGBA pixel value with correct byte ordering for graphics APIs
- * 
- * This macro packs RGBA components into a 32-bit integer with the byte layout:
- * [Blue][Green][Red][Alpha] (little-endian memory layout)
- * 
- * This specific ordering ensures compatibility with:
- * - Windows GDI: Expects BGRA format in DIB sections
- * - macOS Cocoa: Uses kCGImageAlphaPremultipliedFirst | kCGImageByteOrder32Little
- * 
- * The macro places:
- * - Blue in bits 0-7 (least significant byte)
- * - Green in bits 8-15
- * - Red in bits 16-23  
- * - Alpha in bits 24-31 (most significant byte)
- * 
- * @param r Red component (0-255)
- * @param g Green component (0-255)
- * @param b Blue component (0-255)
- * @param a Alpha component (0-255)
- * @return 32-bit pixel value ready for direct use in framebuffers
- */
-#define RGBA(r, g, b, a) ((((b)&0xFF)<<(8*0)) | (((g)&0xFF)<<(8*1)) | (((r)&0xFF)<<(8*2)) | (((a)&0xFF)<<(8*3)))
+#define RGBA(r, g, b, a) (r / 255.0f), (g / 255.0f), (b / 255.0f), (a / 255.0f)
 
 void debug_print(const char* format, ...);
 

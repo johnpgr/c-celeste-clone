@@ -1,9 +1,9 @@
-#include <stdio.h>
 #include <string.h>
 #include "game.h"
 #include "ogg.h"
 #include "utils.h"
-#include "vector.c"
+#include "vector.h"
+#include "gl-renderer.h"
 
 #define MAX_AUDIO_SOURCES 16
 #define STREAM_BUFFER_FRAMES 4096
@@ -12,35 +12,21 @@
 #define TRANSIENT_ARENA_SIZE (128 * 1024 * 1024)
 
 static struct {
-    uint32 display[DISPLAY_WIDTH * DISPLAY_HEIGHT];
     int16 audio[AUDIO_CAPACITY];
     AudioSource audio_sources[MAX_AUDIO_SOURCES];
     uint8 permanent_memory[PERMANENT_ARENA_SIZE];
     uint8 transient_memory[TRANSIENT_ARENA_SIZE];
-} global;
-
-typedef enum {
-    FACE_V1,
-    FACE_V2,
-    FACE_V3,
-    FACE_VT1,
-    FACE_VT2,
-    FACE_VT3,
-    FACE_VN1,
-    FACE_VN2,
-    FACE_VN3,
-} Face_Index;
+} GameContext;
 
 Game game_init(void) {
     debug_print("Initializing game...\n");
-    debug_print("  Display: %dx%d pixels\n", DISPLAY_WIDTH, DISPLAY_HEIGHT);
     debug_print("  Audio: %d Hz, %zu channels, %zu capacity\n", AUDIO_SAMPLE_RATE, AUDIO_CHANNELS, AUDIO_CAPACITY);
     debug_print("  FPS: %d\n", FPS);
     debug_print("  Max audio sources: %d\n", MAX_AUDIO_SOURCES);
 
     // Permanent arena (for static audio, textures, etc.)
     Arena permanent_arena = {
-        .memory = global.permanent_memory,
+        .memory = GameContext.permanent_memory,
         .size = PERMANENT_ARENA_SIZE,
         .offset = 0,
         .name = "Permanent",
@@ -49,7 +35,7 @@ Game game_init(void) {
     
     // Transient arena (for temporary data during processing)
     Arena transient_arena = {
-        .memory = global.transient_memory,
+        .memory = GameContext.transient_memory,
         .size = TRANSIENT_ARENA_SIZE,
         .offset = 0,
         .name = "Transient",
@@ -67,15 +53,11 @@ Game game_init(void) {
         .permanent_arena         = permanent_arena,
         .transient_arena         = transient_arena,
 
-        .display                 = global.display,
-        .display_width           = DISPLAY_WIDTH,
-        .display_height          = DISPLAY_HEIGHT,
-
-        .audio                   = global.audio,
+        .audio                   = GameContext.audio,
         .audio_capacity          = AUDIO_CAPACITY,
         .audio_sample_rate       = AUDIO_SAMPLE_RATE,
         .audio_channels          = AUDIO_CHANNELS,
-        .audio_sources           = global.audio_sources,
+        .audio_sources           = GameContext.audio_sources,
         .audio_sources_capacity  = MAX_AUDIO_SOURCES,
         .audio_sources_size      = 0,
     };
@@ -98,31 +80,14 @@ internal void print_arena_stats(Game* game) {
                arena_get_remaining(&game->transient_arena) / 1024.0f);
 }
 
-internal void render_weird_gradient(Game* game) {
-    uint8* row = (uint8*)game->display;
-    for (usize y = 0; y < game->display_height; y++) {
-        uint32* pixel = (uint32*)row;
-        for (usize x = 0; x < game->display_width; x++) {
-            uint8 blue = (x + game->blue_offset);
-            uint8 green = (y + game->green_offset);
-            *pixel++ = RGBA(0, green, blue, 255);
-        }
-        row += game->display_width * sizeof(uint32);
-    }
-}
-
 void game_update_and_render(Game* game) {
-    game->blue_offset += 1;
-    game->green_offset += 2;
-
-    static uint32 COLOR_BLACK = RGBA(0, 0, 0, 255);
-
-    for (size_t i = 0; i < game->display_width*game->display_height; ++i) {
-        game->display[i] = COLOR_BLACK;
+    for (int x = 0; x < 10; x++) {
+        for (int y = 0; y < 10; y++) {
+            draw_sprite(SPRITE_DICE, (Vec2){x * 100.0, y * 100.0}, (Vec2){100.0, 100.0});
+        }
     }
 
-    render_weird_gradient(game);
-
+    gl_render(game->window_width, game->window_height);
     arena_reset(&game->transient_arena);
 };
 
@@ -267,14 +232,14 @@ void game_free_audio_source(AudioSource* source) {
     
     if (source->type == AUDIO_SOURCE_STATIC) {
         // Note: Arena-allocated memory doesn't need explicit freeing
-        source->static_data.samples = NULL;
+        source->static_data.samples = nullptr;
     } else if (source->type == AUDIO_SOURCE_STREAMING) {
         if (source->stream_data.vorbis) {
             close_stream_source(source);
         }
         // Note: Arena-allocated memory doesn't need explicit freeing
-        source->stream_data.filename = NULL;
-        source->stream_data.stream_buffer = NULL;
+        source->stream_data.filename = nullptr;
+        source->stream_data.stream_buffer = nullptr;
     }
     
     memset(source, 0, sizeof(AudioSource));

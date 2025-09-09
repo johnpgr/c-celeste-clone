@@ -42,7 +42,7 @@ typedef enum {
  * 
  * Creates the application delegate and sets up the Cocoa application.
  */
-void window_init(Game* game);
+void window_init(Game* game, int32 width, int32 height);
 
 /**
  * @brief Clean up window resources

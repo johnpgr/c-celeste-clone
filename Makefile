@@ -1,3 +1,4 @@
+PROJECT_NAME := c-celeste-clone
 INCLUDE_DIR := include
 EXTERNAL_DIR := external
 ASSETS_DIR := assets
@@ -19,25 +20,31 @@ endif
 CC := clang
 CFLAGS := -g -std=c23 -Wall -Wextra -Wno-unused-variable -Wno-unused-function
 
-# Compiler settings based on platform
 ifeq ($(PLATFORM), osx)
     LDLIBS := -framework Cocoa -framework AudioToolbox
 else ifeq ($(PLATFORM), linux)
     LDLIBS := -lX11 -lXext -lm -lpulse -lpulse-simple
 else ifeq ($(PLATFORM), win32)
-    LDLIBS := -lgdi32 -luser32 -lkernel32 -ldsound
+	LDLIBS := -lgdi32 -luser32 -ldsound -lopengl32
     LDFLAGS := -Wl,/SUBSYSTEM:WINDOWS
     TARGET_SUFFIX := .exe
 endif
 
+ifdef RELEASE
+    CFLAGS += -O3 -DNDEBUG
+    BUILD_MODE := release
+else
+    CFLAGS += -DDEBUG_MODE=1
+    BUILD_MODE := debug
+endif
+
+
 # Our include paths
 CFLAGS += -I$(INCLUDE_DIR) -I$(EXTERNAL_DIR) -I$(ASSETS_DIR)
-# Our flags
-CFLAGS += -DDEBUG_MODE=1
 
 # Source files
 MAIN_SRC := $(wildcard src/*.c)
-EXTERNAL_SRC := external/olive.c
+EXTERNAL_SRC := $(wildcard external/*.c)
 
 # Platform-specific sources
 ifeq ($(PLATFORM), osx)
@@ -52,24 +59,21 @@ endif
 SRC := $(MAIN_SRC) $(EXTERNAL_SRC) $(PLATFORM_SRC)
 
 # Target
-TARGET := build/software-rendering-c$(TARGET_SUFFIX)
+TARGET := build/$(BUILD_MODE)/$(PROJECT_NAME)$(TARGET_SUFFIX)
 
-.PHONY: build run clean obj2c teapot
+.PHONY: build run clean release
 
 all: build
 
 build: $(SRC)
-	mkdir -p build
-	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $(TARGET) $(LDLIBS)
+	mkdir -p build/$(BUILD_MODE)
+	$(CC) $(CFLAGS) $^ -o $(TARGET) $(LDFLAGS) $(LDLIBS)
+
+release:
+	$(MAKE) RELEASE=1
 
 run: build
 	./$(TARGET)
-
-obj2c:
-	$(CC) -O3 -o obj2c$(TARGET_SUFFIX) tools/obj2c/obj2c.c
-
-teapot:
-	./obj2c$(TARGET_SUFFIX) $(ASSETS_DIR)/utah-teapot.obj -o $(ASSETS_DIR)/utah-teapot.h
 
 clean:
 	rm -rf build

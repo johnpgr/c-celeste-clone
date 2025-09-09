@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include "game.h"
+#include "gl-renderer.h"
 #include "window.h"
 #include "audio.h"
 #include "utils.h"
@@ -18,14 +19,21 @@ inline void update_fps_counter(Game* game, uint64 current_time) {
 int main(int argc, [[maybe_unused]] char* argv[argc + 1]) {
     Game game = game_init();
 
-    window_init(&game);
+    window_init(&game, 800, 600);
     window_set_resizable(true);
+    gl_init();
 
     audio_init(&game);
 
-    AudioSource* background_ogg = load_ogg_static(
+    static uint8 background_ogg_source[] = {
+        #embed "assets/sounds/Background.ogg"
+    };
+    usize background_ogg_size = sizeof(background_ogg_source);
+
+    AudioSource* background_ogg = load_ogg_static_from_memory(
         &game,
-        "assets/Background.ogg",
+        background_ogg_source,
+        background_ogg_size,
         false
     );
     if (!background_ogg) {
@@ -33,14 +41,24 @@ int main(int argc, [[maybe_unused]] char* argv[argc + 1]) {
         return -1;
     }
 
-    background_ogg->volume = 0.5f;
-    game_play_audio_source(background_ogg);
+    /* background_ogg->volume = 0.5f; */
+    /* game_play_audio_source(background_ogg); */
 
-    AudioSource* explosion_ogg = load_ogg_static(
+    static uint8 explosion_ogg_source[] = {
+        #embed "assets/sounds/Explosion.ogg"
+    };
+    usize explosion_ogg_size = sizeof(explosion_ogg_source);
+
+    AudioSource* explosion_ogg = load_ogg_static_from_memory(
         &game,
-        "assets/Explosion.ogg",
+        explosion_ogg_source,
+        explosion_ogg_size,
         false
     );
+    if (!explosion_ogg) {
+        debug_print("ERROR: Failed to load explosion_ogg\n");
+        return -1;
+    }
     explosion_ogg->volume = 0.3f;
 
     const uint64 NANOS_PER_UPDATE = NANOS_PER_SEC / game.fps;
@@ -114,6 +132,7 @@ int main(int argc, [[maybe_unused]] char* argv[argc + 1]) {
     game_cleanup(&game);
     audio_cleanup();
     window_cleanup();
+    gl_cleanup();
 
     return EXIT_SUCCESS;
 }

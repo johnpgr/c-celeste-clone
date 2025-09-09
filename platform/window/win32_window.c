@@ -2,20 +2,18 @@
 #include <windowsx.h>
 #include "game.h"
 #include "window.h"
+#include "glad/glad.h"
 
 static struct {
-    HWND h_wnd;
+    HWND hwnd;
     HDC hdc;
-    HDC mem_dc;
-    void* dib_pixels;
-    HBITMAP dib_bitmap;
-    HBITMAP old_bitmap;
-    int cached_client_width;
-    int cached_client_height;
+    HGLRC hglrc;
+    int32 client_width;
+    int32 client_height;
     Game* game;
     bool should_close;
     bool is_resizable;
-} g_window_state;
+} WIN32Window;
 
 /**
  * @brief Input state tracking structure
@@ -23,42 +21,101 @@ static struct {
 static struct {
     bool keys[WINDOW_KEY_COUNT];
     bool mouse_buttons[3];
-    int mouse_x, mouse_y;
-} g_input_state;
+    int32 mouse_x, mouse_y;
+} WIN32Input;
 
-/**
- * @brief Extended bitmap info structure that includes color masks for BI_BITFIELDS
- */
-struct {
-    BITMAPINFOHEADER header;
-    DWORD masks[4];
-} g_custom_bitmap_info;
+
+internal bool init_opengl_context() {
+    debug_print("  Initializing OpenGL context.\n");
+
+    PIXELFORMATDESCRIPTOR pfd = {
+        sizeof(PIXELFORMATDESCRIPTOR),
+        1,                     // version number
+        PFD_DRAW_TO_WINDOW |   // support window
+        PFD_SUPPORT_OPENGL |   // support OpenGL
+        PFD_DOUBLEBUFFER,      // double buffered
+        PFD_TYPE_RGBA,         // RGBA type
+        32,                    // 32-bit color depth
+        0, 0, 0, 0, 0, 0,      // color bits ignored
+        0,                     // no alpha buffer
+        0,                     // shift bit ignored
+        0,                     // no accumulation buffer
+        0, 0, 0, 0,            // accum bits ignored
+        24,                    // 24-bit z-buffer
+        8,                     // 8-bit stencil buffer
+        0,                     // no auxiliary buffer
+        PFD_MAIN_PLANE,        // main drawing layer
+        0,                     // reserved
+        0, 0, 0                // layer masks ignored
+    };
+
+    int32 pixel_format = ChoosePixelFormat(WIN32Window.hdc, &pfd);
+    if (!pixel_format) {
+        debug_print("Error: Failed to choose pixel format\n");
+        return false;
+    }
+
+    if (!SetPixelFormat(WIN32Window.hdc, pixel_format, &pfd)) {
+        debug_print("Error: Failed to set pixel format\n");
+        return false;
+    }
+
+    WIN32Window.hglrc = wglCreateContext(WIN32Window.hdc);
+    if (!WIN32Window.hglrc) {
+        debug_print("Error: Failed to create OpenGL context\n");
+        return false;
+    }
+
+    if (!wglMakeCurrent(WIN32Window.hdc, WIN32Window.hglrc)) {
+        debug_print("Error: Failed to make OpenGL context current\n");
+        wglDeleteContext(WIN32Window.hglrc);
+        WIN32Window.hglrc = nullptr;
+        return false;
+    }
+
+    if (!gladLoadGL()) {
+        debug_print("Error: Failed to load OpenGL functions\n");
+        wglMakeCurrent(nullptr, nullptr);
+        wglDeleteContext(WIN32Window.hglrc);
+        WIN32Window.hglrc = nullptr;
+        return false;
+    }
+
+    debug_print("  OpenGL %d.%d loaded successfully\n", GLVersion.major, GLVersion.minor);
+    debug_print("  OpenGL Vendor: %s\n", glGetString(GL_VENDOR));
+    debug_print("  OpenGL Renderer: %s\n", glGetString(GL_RENDERER));
+
+    return true;
+}
 
 /**
  * @brief Map Win32 virtual key codes to our key constants
  */
-static void update_key_state(WPARAM wParam, bool is_pressed) {
+internal void update_key_state(WPARAM wParam, bool is_pressed) {
     switch (wParam) {
         case VK_ESCAPE:
-            g_input_state.keys[WINDOW_KEY_ESCAPE] = is_pressed;
+            WIN32Input.keys[WINDOW_KEY_ESCAPE] = is_pressed;
             break;
         case VK_SPACE:
-            g_input_state.keys[WINDOW_KEY_SPACE] = is_pressed;
+            WIN32Input.keys[WINDOW_KEY_SPACE] = is_pressed;
             break;
         case 'A':
-            g_input_state.keys[WINDOW_KEY_A] = is_pressed;
+            WIN32Input.keys[WINDOW_KEY_A] = is_pressed;
             break;
         case 'D':
-            g_input_state.keys[WINDOW_KEY_D] = is_pressed;
+            WIN32Input.keys[WINDOW_KEY_D] = is_pressed;
             break;
         case 'S':
-            g_input_state.keys[WINDOW_KEY_S] = is_pressed;
+            WIN32Input.keys[WINDOW_KEY_S] = is_pressed;
             break;
         case 'W':
-            g_input_state.keys[WINDOW_KEY_W] = is_pressed;
+            WIN32Input.keys[WINDOW_KEY_W] = is_pressed;
             break;
         case 'F':
-            g_input_state.keys[WINDOW_KEY_F] = is_pressed;
+            WIN32Input.keys[WINDOW_KEY_F] = is_pressed;
+            break;
+        case 'M':
+            WIN32Input.keys[WINDOW_KEY_M] = is_pressed;
             break;
         default:
             break;
@@ -71,7 +128,7 @@ static void update_key_state(WPARAM wParam, bool is_pressed) {
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
         case WM_CLOSE:
-            g_window_state.should_close = true;
+            WIN32Window.should_close = true;
             DestroyWindow(hWnd);
             break;
         case WM_DESTROY:
@@ -86,30 +143,36 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             update_key_state(wParam, false);
             break;
         case WM_LBUTTONDOWN:
-            g_input_state.mouse_buttons[WINDOW_MOUSE_LEFT] = true;
+            WIN32Input.mouse_buttons[WINDOW_MOUSE_LEFT] = true;
             break;
         case WM_LBUTTONUP:
-            g_input_state.mouse_buttons[WINDOW_MOUSE_LEFT] = false;
+            WIN32Input.mouse_buttons[WINDOW_MOUSE_LEFT] = false;
             break;
         case WM_RBUTTONDOWN:
-            g_input_state.mouse_buttons[WINDOW_MOUSE_RIGHT] = true;
+            WIN32Input.mouse_buttons[WINDOW_MOUSE_RIGHT] = true;
             break;
         case WM_RBUTTONUP:
-            g_input_state.mouse_buttons[WINDOW_MOUSE_RIGHT] = false;
+            WIN32Input.mouse_buttons[WINDOW_MOUSE_RIGHT] = false;
             break;
         case WM_MBUTTONDOWN:
-            g_input_state.mouse_buttons[WINDOW_MOUSE_MIDDLE] = true;
+            WIN32Input.mouse_buttons[WINDOW_MOUSE_MIDDLE] = true;
             break;
         case WM_MBUTTONUP:
-            g_input_state.mouse_buttons[WINDOW_MOUSE_MIDDLE] = false;
+            WIN32Input.mouse_buttons[WINDOW_MOUSE_MIDDLE] = false;
             break;
         case WM_MOUSEMOVE:
-            g_input_state.mouse_x = GET_X_LPARAM(lParam);
-            g_input_state.mouse_y = GET_Y_LPARAM(lParam);
+            WIN32Input.mouse_x = GET_X_LPARAM(lParam);
+            WIN32Input.mouse_y = GET_Y_LPARAM(lParam);
             break;
         case WM_SIZE:
-            g_window_state.cached_client_width = LOWORD(lParam);
-            g_window_state.cached_client_height = HIWORD(lParam);
+            WIN32Window.client_width = LOWORD(lParam);
+            WIN32Window.client_height = HIWORD(lParam);
+            
+            if (WIN32Window.game) {
+                WIN32Window.game->window_width = WIN32Window.client_width;
+                WIN32Window.game->window_height = WIN32Window.client_height;
+            }
+
             break;
         default:
             return DefWindowProc(hWnd, uMsg, wParam, lParam);
@@ -117,54 +180,15 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     return 0;
 }
 
-static HBITMAP create_dib_section(HDC hdc, int width, int height, void** pixel_data) {
-    g_custom_bitmap_info.header.biSize = sizeof(BITMAPINFOHEADER);
-    g_custom_bitmap_info.header.biWidth = width;
-    g_custom_bitmap_info.header.biHeight = -height;
-    g_custom_bitmap_info.header.biPlanes = 1;
-    g_custom_bitmap_info.header.biBitCount = 32;
-    g_custom_bitmap_info.header.biCompression = BI_BITFIELDS;
-    g_custom_bitmap_info.header.biSizeImage = 0;
-    
-    g_custom_bitmap_info.masks[0] = 0x000000FF; // Red mask
-    g_custom_bitmap_info.masks[1] = 0x0000FF00; // Green mask  
-    g_custom_bitmap_info.masks[2] = 0x00FF0000; // Blue mask
-    g_custom_bitmap_info.masks[3] = 0xFF000000; // Alpha mask
-    BITMAPINFO bitmapinfo = {};
-
-    bitmapinfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    bitmapinfo.bmiHeader.biWidth = width;
-    bitmapinfo.bmiHeader.biHeight = -height;
-    bitmapinfo.bmiHeader.biPlanes = 1;
-    bitmapinfo.bmiHeader.biBitCount = 32;
-    bitmapinfo.bmiHeader.biCompression = BI_RGB;
-    bitmapinfo.bmiHeader.biSizeImage = 0;
-
-    return CreateDIBSection(hdc, &bitmapinfo, DIB_RGB_COLORS, pixel_data, nullptr, 0);
-}
-
-static void setup_double_buffering() {
-    debug_print("  Setting up double buffering...\n");
-    g_window_state.mem_dc = CreateCompatibleDC(g_window_state.hdc);
-    g_window_state.dib_bitmap = create_dib_section(
-        g_window_state.hdc,
-        g_window_state.game->display_width,
-        g_window_state.game->display_height,
-        &g_window_state.dib_pixels
-    );
-    g_window_state.old_bitmap = SelectObject(g_window_state.mem_dc, g_window_state.dib_bitmap);
-    debug_print("  DIB section created: %dx%d\n", g_window_state.game->display_width, g_window_state.game->display_height);
-}
 
 /**
  * @brief Initialize the window system with a game instance
  */
-void window_init(Game* game) {
+void window_init(Game* game, int32 width, int32 height) {
     debug_print("Initializing window system...\n");
     debug_print("  Title: %s\n", game->title);
-    debug_print("  Display size: %dx%d\n", game->display_width, game->display_height);
     
-    g_window_state.game = game;
+    WIN32Window.game = game;
 
     // Get the current instance handle
     HINSTANCE hInstance = GetModuleHandle(nullptr);
@@ -186,15 +210,15 @@ void window_init(Game* game) {
 
     // Create the window
     DWORD dwStyle = WS_OVERLAPPEDWINDOW ^ WS_THICKFRAME ^ WS_MAXIMIZEBOX;
-    RECT rect = { 0, 0, g_window_state.game->display_width, g_window_state.game->display_height };
+    RECT rect = { 0, 0, width, height };
     AdjustWindowRect(&rect, dwStyle, FALSE);
     
     debug_print("  Adjusted window size: %dx%d\n", rect.right - rect.left, rect.bottom - rect.top);
 
-    g_window_state.h_wnd = CreateWindowEx(
+    WIN32Window.hwnd = CreateWindowEx(
         0,
         "GameWindowClass",
-        g_window_state.game->title,
+        WIN32Window.game->title,
         dwStyle,
         CW_USEDEFAULT, CW_USEDEFAULT,
         rect.right - rect.left,
@@ -205,22 +229,24 @@ void window_init(Game* game) {
         nullptr
     );
 
-    if (!g_window_state.h_wnd) {
+    if (!WIN32Window.hwnd) {
         debug_print("Error: Failed to create window\n");
         return;
     }
     debug_print("  Window created successfully\n");
 
     // Get a device context for the window
-    g_window_state.hdc = GetDC(g_window_state.h_wnd);
+    WIN32Window.hdc = GetDC(WIN32Window.hwnd);
     debug_print("  Device context obtained\n");
-    
-    setup_double_buffering();
-    debug_print("  Double buffering setup complete\n");
+
+    if (!init_opengl_context()) {
+        debug_print("Error: Failed to setup OpenGL context\n");
+        return;
+    }
 
     // Show window
-    ShowWindow(g_window_state.h_wnd, SW_SHOWDEFAULT);
-    UpdateWindow(g_window_state.h_wnd);
+    ShowWindow(WIN32Window.hwnd, SW_SHOWDEFAULT);
+    UpdateWindow(WIN32Window.hwnd);
     
     debug_print("Window system initialized successfully\n");
 }
@@ -229,19 +255,9 @@ void window_init(Game* game) {
  * @brief Present the framebuffer to the screen
  */
 void window_present(void) {
-    if (!g_window_state.h_wnd || !g_window_state.game || !g_window_state.game->display) return;
+    if (!WIN32Window.hwnd || !WIN32Window.hdc) return;
 
-    memcpy(g_window_state.dib_pixels, g_window_state.game->display, 
-           g_window_state.game->display_width * g_window_state.game->display_height * 4);
-
-    StretchBlt(g_window_state.hdc, 
-               0, 0, 
-               g_window_state.cached_client_width, g_window_state.cached_client_height,
-               g_window_state.mem_dc, 
-               0, 0, 
-               g_window_state.game->display_width, 
-               g_window_state.game->display_height,
-               SRCCOPY);
+    SwapBuffers(WIN32Window.hdc);
 }
 
 /**
@@ -249,19 +265,22 @@ void window_present(void) {
  */
 void window_cleanup(void) {
     debug_print("Cleaning up window system...\n");
-    if (g_window_state.hdc) {
-        ReleaseDC(g_window_state.h_wnd, g_window_state.hdc);
-        g_window_state.hdc = nullptr;
+
+    if (WIN32Window.hglrc) {
+        wglMakeCurrent(nullptr, nullptr);
+        wglDeleteContext(WIN32Window.hglrc);
+        WIN32Window.hglrc = nullptr;
+        debug_print("  OpenGL context deleted\n");
+    }
+
+    if (WIN32Window.hdc) {
+        ReleaseDC(WIN32Window.hwnd, WIN32Window.hdc);
+        WIN32Window.hdc = nullptr;
         debug_print("  Device context released\n");
     }
-    if (g_window_state.dib_bitmap) {
-        DeleteObject(g_window_state.dib_bitmap);
-        g_window_state.dib_bitmap = nullptr;
-        debug_print("  DIB bitmap deleted\n");
-    }
-    if (g_window_state.h_wnd) {
-        DestroyWindow(g_window_state.h_wnd);
-        g_window_state.h_wnd = nullptr;
+    if (WIN32Window.hwnd) {
+        DestroyWindow(WIN32Window.hwnd);
+        WIN32Window.hwnd = nullptr;
         debug_print("  Window destroyed\n");
     }
     debug_print("Window system cleaned up\n");
@@ -271,7 +290,7 @@ void window_cleanup(void) {
  * @brief Check if the window should close
  */
 bool window_should_close(void) {
-    return g_window_state.should_close;
+    return WIN32Window.should_close;
 }
 
 /**
@@ -290,7 +309,7 @@ void window_poll_events(void) {
  */
 bool window_get_key_state(WindowKey key) {
     if (key >= 0 && key < WINDOW_KEY_COUNT) {
-        return g_input_state.keys[key];
+        return WIN32Input.keys[key];
     }
     return false;
 }
@@ -299,8 +318,8 @@ bool window_get_key_state(WindowKey key) {
  * @brief Get the current mouse position
  */
 void window_get_mouse_position(int* x, int* y) {
-    if (x) *x = g_input_state.mouse_x;
-    if (y) *y = g_input_state.mouse_y;
+    if (x) *x = WIN32Input.mouse_x;
+    if (y) *y = WIN32Input.mouse_y;
 }
 
 /**
@@ -308,7 +327,7 @@ void window_get_mouse_position(int* x, int* y) {
  */
 bool window_get_mouse_button_state(int button) {
     if (button >= 0 && button < 3) {
-        return g_input_state.mouse_buttons[button];
+        return WIN32Input.mouse_buttons[button];
     }
     return false;
 }
@@ -317,8 +336,8 @@ bool window_get_mouse_button_state(int button) {
  * @brief Set the window title
  */
 void window_set_title(const char* title) {
-    if (g_window_state.h_wnd && title) {
-        SetWindowText(g_window_state.h_wnd, title);
+    if (WIN32Window.hwnd && title) {
+        SetWindowText(WIN32Window.hwnd, title);
     }
 }
 
@@ -326,14 +345,14 @@ void window_set_title(const char* title) {
  * @brief Get the current window size
  */
 void window_get_size(int* width, int* height) {
-    if (!g_window_state.h_wnd) {
+    if (!WIN32Window.hwnd) {
         if (width) *width = 0;
         if (height) *height = 0;
         return;
     }
 
     RECT client_rect;
-    GetClientRect(g_window_state.h_wnd, &client_rect);
+    GetClientRect(WIN32Window.hwnd, &client_rect);
     if (width) *width = client_rect.right - client_rect.left;
     if (height) *height = client_rect.bottom - client_rect.top;
 }
@@ -342,23 +361,23 @@ void window_get_size(int* width, int* height) {
  * @brief Set the window size
  */
 void window_set_size(int width, int height) {
-    if (!g_window_state.h_wnd) return;
+    if (!WIN32Window.hwnd) return;
 
     RECT rect = { 0, 0, width, height };
-    DWORD dwStyle = GetWindowLong(g_window_state.h_wnd, GWL_STYLE);
+    DWORD dwStyle = GetWindowLong(WIN32Window.hwnd, GWL_STYLE);
     AdjustWindowRect(&rect, dwStyle, FALSE);
 
-    SetWindowPos(g_window_state.h_wnd, nullptr, 0, 0, rect.right - rect.left, rect.bottom - rect.top, SWP_NOMOVE | SWP_NOZORDER);
+    SetWindowPos(WIN32Window.hwnd, nullptr, 0, 0, rect.right - rect.left, rect.bottom - rect.top, SWP_NOMOVE | SWP_NOZORDER);
 }
 
 /**
  * @brief Set whether the window is resizable
  */
 void window_set_resizable(bool resizable) {
-    if (!g_window_state.h_wnd) return;
-    g_window_state.is_resizable = resizable;
+    if (!WIN32Window.hwnd) return;
+    WIN32Window.is_resizable = resizable;
     
-    DWORD dwStyle = GetWindowLong(g_window_state.h_wnd, GWL_STYLE);
+    DWORD dwStyle = GetWindowLong(WIN32Window.hwnd, GWL_STYLE);
     if (resizable) {
         dwStyle |= WS_THICKFRAME;
         dwStyle |= WS_MAXIMIZEBOX;
@@ -367,6 +386,6 @@ void window_set_resizable(bool resizable) {
         dwStyle &= ~WS_MAXIMIZEBOX;
     }
     
-    SetWindowLong(g_window_state.h_wnd, GWL_STYLE, dwStyle);
+    SetWindowLong(WIN32Window.hwnd, GWL_STYLE, dwStyle);
 }
 
