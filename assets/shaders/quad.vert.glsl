@@ -12,6 +12,7 @@ layout (std430, binding = 0) buffer SBO {
 };
 
 uniform vec2 screen_size;
+uniform mat4 camera_matrix;
 
 layout (location = 0) out vec2 texture_coords_out;
 
@@ -40,8 +41,9 @@ void main(void) {
     };
 
     vec2 vertex_pos = vertices[indices[gl_VertexID]];
-    vertex_pos.y = -vertex_pos.y + screen_size.y;
-    vertex_pos = 2.0 * (vertex_pos / screen_size) - 1.0;
-    gl_Position = vec4(vertex_pos, 0.0, 1.0);
+    // vertex_pos.y = -vertex_pos.y + screen_size.y;
+    // vertex_pos = 2.0 * (vertex_pos / screen_size) - 1.0;
+    gl_Position = camera_matrix * vec4(vertex_pos, 0.0, 1.0);
+
     texture_coords_out = texture_coords[indices[gl_VertexID]];
 }

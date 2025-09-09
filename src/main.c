@@ -4,11 +4,11 @@
 
 #include "arena.c"
 #include "assets.c"
+#include "math.c"
 #include "game.c"
 #include "gl_renderer.c"
 #include "log.c"
 #include "ogg.c"
-#include "vector.c"
 
 #include "window.h"
 #include "audio.h"
@@ -26,10 +26,10 @@ inline void update_fps_counter(Game* game, uint64 current_time) {
 int main(int argc, [[maybe_unused]] char* argv[argc + 1]) {
     Game game = game_init();
 
-    window_init(&game, 800, 600);
+    window_init(&game, WORLD_WIDTH * 4, WORLD_HEIGHT * 4);
     window_set_vsync(false);
     audio_init(&game);
-    gl_init();
+    gl_init(&game);
 
     static uint8 background_ogg_source[] = {
         #embed "assets/sounds/Background.ogg"

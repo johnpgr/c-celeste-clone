@@ -17,7 +17,7 @@
 
 #include "def.h"
 #include "arena.h"
-#include "audio-source.h"
+#include "audio_source.h"
 
 #define TITLE "The game"
 #define FPS 60
@@ -25,8 +25,11 @@
 #define AUDIO_SAMPLE_RATE 48000
 #define AUDIO_CHANNELS 2
 #define AUDIO_CAPACITY ((AUDIO_SAMPLE_RATE / FPS) * AUDIO_CHANNELS)
-
 static_assert(AUDIO_SAMPLE_RATE % FPS == 0, "Audio sample rate must be divisible by fps");
+
+#define WORLD_WIDTH 320
+#define WORLD_HEIGHT 180
+#define TILESIZE 8
 
 typedef struct {
     char* title;
@@ -52,6 +55,8 @@ typedef struct {
     AudioSource* audio_sources;
     usize audio_sources_capacity;
     usize audio_sources_size;
+
+    Vec2 camera_position;
 } Game;
 
 Game game_init(void);

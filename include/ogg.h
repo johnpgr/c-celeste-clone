@@ -1,6 +1,6 @@
 #pragma once
 
-#include "audio-source.h"
+#include "audio_source.h"
 #include "game.h"
 
 AudioSource* load_ogg_streaming(Game* game, const char* filename, int stream_buffer_frames, bool loop);

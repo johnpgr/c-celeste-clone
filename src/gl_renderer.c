@@ -1,6 +1,7 @@
 #include "gl_renderer.h"
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
+#include "game.h"
 
 static struct {
     GLuint program;
@@ -10,9 +11,12 @@ static struct {
     GLuint VAO;
     GLuint SBO;
     GLuint screen_size;
+    GLuint camera_matrix;
 } GLContext;
 
 static struct {
+    OrthographicCamera2D game_camera;
+    OrthographicCamera2D ui_camera;
     usize transform_count;
     Transform transforms[MAX_TRANSFORMS];
 } RendererState;
@@ -89,7 +93,7 @@ internal GLuint load_texture(const uint8* png_data, usize png_size) {
     return texture;
 }
 
-bool gl_init() {
+bool gl_init(Game* game) {
     glDebugMessageCallback(&gl_debug_callback, nullptr);
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
     glEnable(GL_DEBUG_OUTPUT);
@@ -155,20 +159,37 @@ bool gl_init() {
     glUseProgram(GLContext.program);
 
     GLContext.screen_size = glGetUniformLocation(GLContext.program, "screen_size");
+    GLContext.camera_matrix = glGetUniformLocation(GLContext.program, "camera_matrix");
+
+    RendererState.game_camera.zoom = 0.0;
+    RendererState.game_camera.dimensions = vec2(WORLD_WIDTH, WORLD_HEIGHT);
+    RendererState.game_camera.position = game->camera_position;
+    RendererState.ui_camera = RendererState.game_camera;
 
     return true;
 }
 
-void gl_render(int window_width, int window_height) {
+void gl_render(Game* game) {
+    RendererState.game_camera.position = game->camera_position;
+
     glClearColor(RGBA(181, 101, 174, 255));
     glClearDepth(0.0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glViewport(0, 0, window_width, window_height);
+    glViewport(0, 0, game->window_width, game->window_height);
     glUniform2fv(
         GLContext.screen_size,
         1,
-        (real32[]){window_width, window_height}
+        (real32[]){game->window_width, game->window_height}
     );
+
+    OrthographicCamera2D camera = RendererState.game_camera;
+    Mat4x4 camera_matrix = create_orthographic(
+        camera.position.x - camera.dimensions.x / 2.0,
+        camera.position.x + camera.dimensions.x / 2.0,
+        camera.position.y - camera.dimensions.y / 2.0,
+        camera.position.y + camera.dimensions.y / 2.0
+    );
+    glUniformMatrix4fv(GLContext.camera_matrix, 1, GL_FALSE, &camera_matrix.ax);
 
     glNamedBufferSubData(
         GLContext.SBO,
@@ -194,17 +215,19 @@ void gl_cleanup() {
     glDeleteTextures(1, &GLContext.texture);
 }
 
-void draw_sprite(SpriteID sprite_id, Vec2 pos, Vec2 size) {
+void draw_sprite(SpriteID sprite_id, Vec2 pos) {
     assert(RendererState.transform_count + 1 <= MAX_TRANSFORMS
            && "Max transform count reached");
 
     Sprite sprite = get_sprite(sprite_id);
 
+    Vec2 sprite_size = vec2iv2(sprite.size);
+
     Transform transform = {
         .atlas_offset = sprite.atlas_offset,
         .sprite_size = sprite.size,
-        .pos = pos,
-        .size = size,
+        .pos = vec2_div(vec2_minus(pos, sprite_size), 2.0f),
+        .size = sprite_size,
     };
 
     RendererState.transforms[RendererState.transform_count++] = transform;

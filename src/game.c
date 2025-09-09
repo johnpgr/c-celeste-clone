@@ -2,7 +2,6 @@
 #include "game.h"
 #include "ogg.h"
 #include "utils.h"
-#include "vector.h"
 #include "gl_renderer.h"
 
 #define MAX_AUDIO_SOURCES 16
@@ -60,6 +59,8 @@ Game game_init(void) {
         .audio_sources           = GameContext.audio_sources,
         .audio_sources_capacity  = MAX_AUDIO_SOURCES,
         .audio_sources_size      = 0,
+
+        .camera_position = vec2(0, 0),
     };
     
     debug_print("Game initialized successfully\n");
@@ -81,13 +82,11 @@ internal void print_arena_stats(Game* game) {
 }
 
 void game_update_and_render(Game* game) {
-    for (int x = 0; x < 10; x++) {
-        for (int y = 0; y < 10; y++) {
-            draw_sprite(SPRITE_DICE, (Vec2){x * 100.0, y * 100.0}, (Vec2){100.0, 100.0});
-        }
-    }
+    game->camera_position.x = 160;
+    game->camera_position.y = 90;
+    draw_sprite(SPRITE_DICE, vec2(0, 0));
 
-    gl_render(game->window_width, game->window_height);
+    gl_render(game);
     arena_reset(&game->transient_arena);
 };
 
