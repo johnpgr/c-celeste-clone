@@ -207,6 +207,8 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         case WM_SYSKEYUP: {
             bool is_down = (uMsg == WM_KEYDOWN) || (uMsg == WM_SYSKEYDOWN) || (uMsg == WM_LBUTTONDOWN);
             KeyCode keycode = keycode_lookup_table[wParam];
+            debug_print("Key event: wParam=0x%02X, keycode=%d, is_down=%s\n", 
+                       (int)wParam, keycode, is_down ? "true" : "false");
             Key* key = &input_state->keys[keycode];
             key->just_pressed = !key->just_pressed && !key->is_down && is_down;
             key->just_released = !key->just_released && key->is_down && !is_down;
@@ -225,6 +227,8 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 (uMsg == WM_MBUTTONDOWN || uMsg == WM_MBUTTONUP) ? VK_MBUTTON : VK_RBUTTON;
 
             KeyCode keycode = keycode_lookup_table[mousecode];
+            debug_print("Mouse event: mousecode=0x%02X, keycode=%d, is_down=%s\n", 
+                       mousecode, keycode, is_down ? "true" : "false");
             Key* key = &input_state->keys[keycode];
             key->just_pressed = !key->just_pressed && !key->is_down && is_down;
             key->just_released = !key->just_released && key->is_down && !is_down;
@@ -306,6 +310,8 @@ void window_init() {
 
     UpdateWindow(win32_window.hwnd);
     
+    win32_fill_input_lookup_table();
+
     debug_print("Window system initialized successfully\n");
 }
 

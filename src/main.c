@@ -146,7 +146,7 @@ int main(int argc, [[maybe_unused]] char* argv[argc + 1]) {
     // TODO: Separate render thread from main thread 
     // (for resizing, moving the window without stopping the render)
     // Audio thread is already separate
-    while (!window_should_close()) {
+    while (!window_should_close() && !game_state->should_quit) {
         uint64 current_time = current_time_nanos();
         uint64 delta_time = current_time - last_time;
         last_time = current_time;

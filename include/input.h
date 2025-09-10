@@ -2,6 +2,7 @@
 #include "def.h"
 #include "consts.h"
 #include "arena.h"
+#include "math3d.h"
 
 typedef enum
 {
@@ -74,7 +75,6 @@ typedef enum
   KEY_COUNT = 255
 } KeyCode;
 
-
 typedef struct {
     bool is_down;
     bool just_pressed;
@@ -100,31 +100,28 @@ static InputState* input_state;
 static InputState* create_input_state(Arena* arena) {
     InputState* state = (InputState*)arena_alloc(arena, sizeof(InputState));
     memset(state, 0, sizeof(InputState));
-    state->screen_size = (IVec2){WORLD_WIDTH * SCALE, WORLD_HEIGHT * SCALE};
-    state->mouse_pos = (IVec2){0, 0};
-    state->mouse_pos_prev = (IVec2){0, 0};
-    state->mouse_delta = (IVec2){0, 0};
+    state->screen_size = ivec2(WORLD_WIDTH * SCALE, WORLD_HEIGHT * SCALE);
+    state->mouse_pos = ivec2(0, 0);
+    state->mouse_pos_prev = ivec2(0, 0);
+    state->mouse_delta = ivec2(0, 0);
     return state;
 }
 
 static KeyCode keycode_lookup_table[KEY_COUNT] = {};
 
 bool key_pressed(KeyCode code) {
-    assert(input_state != nullptr);
     Key key = input_state->keys[code];
     return key.is_down && (key.half_transition_count == 1
         || key.half_transition_count > 1);
 }
 
 bool key_released(KeyCode code) {
-    assert(input_state != nullptr);
     Key key = input_state->keys[code];
     return !key.is_down && (key.half_transition_count == 1
         || key.half_transition_count > 1);
 }
 
 bool key_is_down(KeyCode code) {
-    assert(input_state != nullptr);
     Key key = input_state->keys[code];
     return key.is_down;
 }

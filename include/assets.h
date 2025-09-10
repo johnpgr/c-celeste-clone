@@ -1,5 +1,5 @@
 #pragma once
-#include "def.h"
+#include "math3d.h"
 
 typedef enum {
     SPRITE_DICE,

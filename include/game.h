@@ -10,7 +10,9 @@
 #include "arena.h"
 #include "audio.h"
 #include "input.h"
+#include "math3d.h"
 #include "renderer.h"
+#include "array.h"
 
 typedef enum {
     MOVE_LEFT,
@@ -22,24 +24,56 @@ typedef enum {
     MOUSE_LEFT,
     MOUSE_RIGHT,
 
+    QUIT,
+
     GAME_INPUT_COUNT
 } GameInputType;
 
+typedef ARRAY(KeyCode, 3) KeyCodes;
+
 typedef struct {
+    KeyCodes keys;
+} KeyMapping;
+
+typedef struct {
+    bool should_quit;
     bool fps_cap;
     Vec2 camera_position;
     IVec2 player_position;
+
+    KeyMapping key_mappings[GAME_INPUT_COUNT];
 } GameState;
 
 static GameState* game_state;
 
+static void init_key_mappings(GameState* state) {
+    array_push(state->key_mappings[MOVE_UP].keys, KEY_W);
+    array_push(state->key_mappings[MOVE_UP].keys, KEY_UP);
+    array_push(state->key_mappings[MOVE_LEFT].keys, KEY_A);
+    array_push(state->key_mappings[MOVE_LEFT].keys, KEY_LEFT);
+    array_push(state->key_mappings[MOVE_DOWN].keys, KEY_S);
+    array_push(state->key_mappings[MOVE_DOWN].keys, KEY_DOWN);
+    array_push(state->key_mappings[MOVE_RIGHT].keys, KEY_D);
+    array_push(state->key_mappings[MOVE_RIGHT].keys, KEY_RIGHT);
+    array_push(state->key_mappings[MOUSE_LEFT].keys, KEY_MOUSE_LEFT);
+    array_push(state->key_mappings[MOUSE_RIGHT].keys, KEY_MOUSE_RIGHT);
+    array_push(state->key_mappings[QUIT].keys, KEY_ESCAPE);
+}
+
 static GameState* create_game_state(Arena* arena) {
     GameState* state = (GameState*)arena_alloc(arena, sizeof(GameState));
     memset(state, 0, sizeof(GameState));
+
     state->fps_cap = true;
-    state->camera_position = (Vec2){0.0f, 0.0f};
-    state->player_position = (IVec2){0, 0};
+    state->camera_position = vec2(0.0, 0.0);
+    state->player_position = ivec2(0, 0);
+    for (int i = 0; i < GAME_INPUT_COUNT; i++) {
+        state->key_mappings[i].keys.capacity = 3;
+    }
+
+    init_key_mappings(state);
+
     return state;
 }
 
-export void game_update(GameState* game_state, RendererState* renderer_state, InputState* input_state, AudioState* audio_state);
+EXPORT_FN void game_update(GameState* game_state, RendererState* renderer_state, InputState* input_state, AudioState* audio_state);
