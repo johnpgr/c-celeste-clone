@@ -5,19 +5,24 @@ A game cloning (Celeste) project using [cakez yt playlist](https://www.youtube.c
 ## Features
 
 - **Cross-platform support**: Windows, Linux, and macOS
-- **Hot-reloadable game logic**: Modify game code without restarting
-- **Modern C**: Uses C23 standard with clean, organized code
-- **Custom engine**: Built-in renderer, audio system, and platform abstraction
-- **Memory management**: Arena-based allocators for efficient memory usage
-
-## Building
-
 ### Prerequisites
 
-- **Clang compiler** with C23 support
+- **Clang/LLVM** with C23 support
 - **Make** build system
+- **OpenGL** drivers/development libraries
 - Platform-specific dependencies:
-  - **Windows**: Visual Studio Build Tools or similar
+  - **Windows**: DirectSound (dsound), GDI32, User32 (included with Windows SDK)
+  - **Linux**: X11, Xext, PulseAudio development libraries (`libx11-dev`, `libxext-dev`, `libpulse-dev`)
+  - **macOS**: Cocoa, AudioToolbox frameworks (included with Xcode command line tools)
+
+### Build Commands
+
+```bash
+# Debug build (default)
+make
+
+# Release build
+make release
   - **Linux**: X11, OpenGL, PulseAudio development libraries
   - **macOS**: Xcode command line tools
 
