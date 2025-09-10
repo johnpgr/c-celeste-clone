@@ -47,7 +47,7 @@ static inline void sleep_nanos(uint64 nanos) {
 #endif
 }
 
-static inline IVec2 screen_to_world(InputState* input_state, RendererState* renderer_state, IVec2 screen_pos) {
+static IVec2 screen_to_world(InputState* input_state, RendererState* renderer_state, IVec2 screen_pos) {
     OrthographicCamera2D camera = renderer_state->game_camera;
 
     int x = (real32)screen_pos.x / 

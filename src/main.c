@@ -1,38 +1,43 @@
-#ifdef _WIN32
 #define _CRT_SECURE_NO_WARNINGS
+#include "../platform/renderer/gl_renderer.c"
+#include "../external/glad.c"
+
+#ifdef _WIN32
+#include "../platform/window/win32_window.c"
+#include "../platform/audio/win32_audio.c"
+#include "../platform/file/win32_file.c"
+#include "../platform/dynlib/win32_dynlib.c"
+#elif defined(__linux__)
+#include "../platform/window/linux_window.c"
+#include "../platform/audio/linux_audio.c"
+#include "../platform/file/linux_file.c"
+#include "../platform/dynlib/linux_dynlib.c"
+#elif defined(__APPLE__)
+#include "../platform/window/osx_window.m"
+#include "../platform/audio/osx_audio.c"
+#include "../platform/file/osx_file.c"
+#include "../platform/dynlib/osx_dynlib.c"
 #endif
-
-#include "arena.c"
-#include "assets.c"
-#include "math.c"
-#include "log.c"
-#include "audio.c"
-
-#include "window.h"
-#include "renderer.h"
-#include "platform_audio.h"
-#include "game.h"
-#include "utils.h"
-#include "file.h"
-#include "dynlib.h"
 
 typedef void GameUpdateFn(GameState*, RendererState*, InputState*, AudioState*);
 static GameUpdateFn* game_update_ptr;
 
-internal void game_update(
-    GameState *game_state,
-    RendererState *renderer_state,
-    InputState *input_state,
+static void game_update(
+    GameState* game_state,
+    RendererState* renderer_state,
+    InputState* input_state,
     AudioState* audio_state
 ) {
     game_update_ptr(game_state, renderer_state, input_state, audio_state);
 }
 
-internal void reload_game_dll(Arena* transient_storage) {
+static void reload_game_dll(Arena* transient_storage) {
     static void* game_dll;
     static uint64 game_dll_timestamp;
 
     uint64 current_dll_timestamp = file_get_timestamp("game.dll");
+    assert(current_dll_timestamp != 0 && "Failed to get timestamp of game.dll");
+
     if (current_dll_timestamp > game_dll_timestamp) {
         if (game_dll) {
             dynlib_close(game_dll);
@@ -53,7 +58,7 @@ internal void reload_game_dll(Arena* transient_storage) {
     }
 }
 
-internal void print_arena_stats(Arena* permanent_storage, Arena* transient_storage) {
+static void print_arena_stats(Arena* permanent_storage, Arena* transient_storage) {
     debug_print("Arena statistics:\n");
     debug_print(
         "  Permanent: %.1f/%.1f KB used (%.1f%%, %.1f KB remaining)\n",
@@ -135,7 +140,7 @@ int main(int argc, [[maybe_unused]] char* argv[argc + 1]) {
     uint64 accumulator = 0;
     uint64 last_time = current_time_nanos();
 
-    // window_show();
+    window_show();
 
     // TODO: Separate render thread from main thread 
     // (for resizing, moving the window without stopping the render)

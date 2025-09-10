@@ -15,7 +15,6 @@
 #pragma once
 #include "def.h"
 #include "arena.h"
-#include "consts.h"
 #include "audio.h"
 #include "input.h"
 #include "renderer.h"

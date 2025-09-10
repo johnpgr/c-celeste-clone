@@ -15,7 +15,7 @@ typedef struct {
     pthread_mutex_t mutex;
 } RingBuffer;
 
-internal struct {
+static struct {
     Game* game;
     pa_simple* pulse_simple;
     RingBuffer ring_buffer;
@@ -26,7 +26,7 @@ internal struct {
     uint32 samples_per_buffer;
 } global_audio_state;
 
-internal void ring_buffer_init(RingBuffer* rb, usize capacity) {
+static void ring_buffer_init(RingBuffer* rb, usize capacity) {
     // TODO: Handle allocations with our own allocator
     rb->data = calloc(capacity, sizeof(int16));
     rb->capacity = capacity;
@@ -36,13 +36,13 @@ internal void ring_buffer_init(RingBuffer* rb, usize capacity) {
     pthread_mutex_init(&rb->mutex, nullptr);
 }
 
-internal void ring_buffer_destroy(RingBuffer* rb) {
+static void ring_buffer_destroy(RingBuffer* rb) {
     pthread_mutex_destroy(&rb->mutex);
     free(rb->data);
     rb->data = nullptr;
 }
 
-internal usize ring_buffer_write(RingBuffer* rb, const int16* data, usize samples) {
+static usize ring_buffer_write(RingBuffer* rb, const int16* data, usize samples) {
     pthread_mutex_lock(&rb->mutex);
     
     usize space_available = rb->capacity - rb->available;
@@ -59,7 +59,7 @@ internal usize ring_buffer_write(RingBuffer* rb, const int16* data, usize sample
     return samples_to_write;
 }
 
-internal usize ring_buffer_read(RingBuffer* rb, int16* data, usize samples) {
+static usize ring_buffer_read(RingBuffer* rb, int16* data, usize samples) {
     pthread_mutex_lock(&rb->mutex);
     
     usize samples_to_read = (samples < rb->available) ? samples : rb->available;
@@ -75,7 +75,7 @@ internal usize ring_buffer_read(RingBuffer* rb, int16* data, usize samples) {
     return samples_to_read;
 }
 
-internal void* audio_thread_proc(void* param) {
+static void* audio_thread_proc(void* param) {
     Game* game = (Game*)param;
     
     // Calculate buffer size for one frame worth of audio

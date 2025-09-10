@@ -11,6 +11,7 @@ PROJECT_NAME := c-celeste-clone
 INCLUDE_DIR := include
 EXTERNAL_DIR := external
 PLATFORM_DIR := platform
+EXTERNAL_INCLUDE_DIR := $(EXTERNAL_DIR)/include
 ASSETS_DIR := assets
 BUILD_DIR := build
 
@@ -50,7 +51,6 @@ endif
 BUILD_MODE_DIR := $(BUILD_DIR)/$(BUILD_MODE)
 OBJ_DIR := $(BUILD_MODE_DIR)/obj
 BIN_DIR := $(BUILD_MODE_DIR)/bin
-LIB_DIR := $(BUILD_MODE_DIR)/lib
 
 # ==============================================================================
 # Compiler Configuration
@@ -58,7 +58,7 @@ LIB_DIR := $(BUILD_MODE_DIR)/lib
 
 CC := clang
 BASE_CFLAGS := -std=c23 -Wall -Wextra -Wno-unused-variable -Wno-unused-function -MMD -MP
-INCLUDE_FLAGS := -I$(INCLUDE_DIR) -I$(EXTERNAL_DIR) -I$(ASSETS_DIR)
+INCLUDE_FLAGS := -I$(INCLUDE_DIR) -I$(EXTERNAL_DIR) -I$(EXTERNAL_INCLUDE_DIR)
 CFLAGS := $(BASE_CFLAGS) $(OPTIMIZATION_FLAGS) $(INCLUDE_FLAGS)
 
 # ==============================================================================
@@ -80,64 +80,36 @@ endif
 LDFLAGS += -fuse-ld=lld
 
 # ==============================================================================
-# Source File Discovery
+# Source File Configuration - Two Translation Units
 # ==============================================================================
 
-# Renderer implementation
-RENDERER_USED := gl
-
-# Main application source files
-# MAIN_SRC := $(wildcard src/*.c)
+# Main application source file - single translation unit
 MAIN_SRC := src/main.c
 
-# Game source files for dynamic library
+# Game source file for dynamic library - single translation unit
 GAME_SRC := src/game.c
 
-# External library source files
-EXTERNAL_SRC := $(wildcard external/*.c)
-
-# Platform-specific source files
-ifeq ($(PLATFORM), osx)
-    PLATFORM_SRC := $(wildcard $(PLATFORM_DIR)/*/osx_*.c) \
-                     $(wildcard $(PLATFORM_DIR)/*/osx_*.m)
-else ifeq ($(PLATFORM), linux)
-    PLATFORM_SRC := $(wildcard $(PLATFORM_DIR)/*/linux_*.c)
-else ifeq ($(PLATFORM), win32)
-    PLATFORM_SRC := $(wildcard $(PLATFORM_DIR)/*/win32_*.c)
-endif
-
-# Combined source files
-SRC := $(MAIN_SRC) $(EXTERNAL_SRC) $(PLATFORM_SRC)
-
-# Add renderer source file based on selected renderer
-SRC += $(PLATFORM_DIR)/renderer/$(RENDERER_USED)_renderer.c
+# Combined source files for main executable
+SRC := $(MAIN_SRC)
 
 # ==============================================================================
 # Object File and Dependency Generation
 # ==============================================================================
 
 # Convert source files to object file paths
-OBJ := $(addprefix $(OBJ_DIR)/,$(notdir $(patsubst %.c,%.o,$(filter %.c,$(SRC))))) \
-       $(addprefix $(OBJ_DIR)/,$(notdir $(patsubst %.m,%.o,$(filter %.m,$(SRC)))))
+OBJ := $(addprefix $(OBJ_DIR)/,$(notdir $(patsubst %.c,%.o,$(filter %.c,$(SRC)))))
 
 # Game DLL object files
 GAME_OBJ := $(addprefix $(OBJ_DIR)/,$(notdir $(patsubst %.c,%.o,$(GAME_SRC))))
 
 # Dependency files for incremental builds
-DEPS := $(OBJ:.o=.d)
-
-# Categorize object files for library creation
-EXTERNAL_OBJ := $(filter %/external/%.o,$(OBJ))
-PLATFORM_OBJ := $(filter %/platform/%.o,$(OBJ))
-MAIN_OBJ := $(filter-out $(EXTERNAL_OBJ) $(PLATFORM_OBJ),$(OBJ))
+DEPS := $(OBJ:.o=.d) $(GAME_OBJ:.o=.d)
 
 # ==============================================================================
 # Target Definitions
 # ==============================================================================
 
 TARGET := $(BIN_DIR)/$(PROJECT_NAME)$(TARGET_SUFFIX)
-EXTERNAL_LIB := $(LIB_DIR)/libexternal.a
-PLATFORM_LIB := $(LIB_DIR)/libplatform.a
 
 # Game dynamic library
 ifeq ($(PLATFORM), win32)
@@ -167,32 +139,20 @@ build: $(TARGET)
 game-dll: $(GAME_DLL)
 
 # Final executable linking
-$(TARGET): $(MAIN_OBJ) $(EXTERNAL_LIB) $(PLATFORM_LIB)
+$(TARGET): $(OBJ)
 	@mkdir -p $(dir $@)
 	@echo "Linking $(PROJECT_NAME)..."
 	$(CC) $^ -o $@ $(LDFLAGS) $(LINK_DEBUG_FLAGS) $(LDLIBS)
 	@echo "Build complete: $@"
 
-# External dependencies static library
-$(EXTERNAL_LIB): $(EXTERNAL_OBJ)
-	@mkdir -p $(LIB_DIR)
-	@echo "Creating external library..."
-	ar rcs $@ $^
-
-# Platform-specific code static library
-$(PLATFORM_LIB): $(PLATFORM_OBJ)
-	@mkdir -p $(LIB_DIR)
-	@echo "Creating platform library..."
-	ar rcs $@ $^
-
 # Game dynamic library compilation
-$(GAME_DLL): $(GAME_OBJ) $(EXTERNAL_LIB) $(PLATFORM_LIB)
+$(GAME_DLL): $(GAME_OBJ)
 	@mkdir -p $(dir $@)
 	@echo "Building game dynamic library..."
 ifeq ($(PLATFORM), win32)
-	$(CC) $(GAME_OBJ) $(EXTERNAL_LIB) $(PLATFORM_LIB) -o $@ $(GAME_DLL_FLAGS) $(LINK_DEBUG_FLAGS) $(LDLIBS)
+	$(CC) $(GAME_OBJ) -o $@ $(GAME_DLL_FLAGS) $(LINK_DEBUG_FLAGS) $(LDLIBS)
 else
-	$(CC) $(GAME_OBJ) $(EXTERNAL_LIB) $(PLATFORM_LIB) -o $@ $(GAME_DLL_FLAGS) $(LDFLAGS) $(LINK_DEBUG_FLAGS) $(LDLIBS)
+	$(CC) $(GAME_OBJ) -o $@ $(GAME_DLL_FLAGS) $(LDFLAGS) $(LINK_DEBUG_FLAGS) $(LDLIBS)
 endif
 	@echo "Game DLL complete: $@"
 
@@ -201,17 +161,10 @@ endif
 # ==============================================================================
 
 # Set up source search paths
-PLATFORM_SUBDIRS := $(wildcard $(PLATFORM_DIR)/*)
-VPATH := src external $(PLATFORM_SUBDIRS)
+VPATH := src
 
 # C source compilation
 $(OBJ_DIR)/%.o: %.c
-	@mkdir -p $(dir $@)
-	@echo "Compiling $<..."
-	$(CC) $(CFLAGS) -c $< -o $@
-
-# Objective-C source compilation (macOS)
-$(OBJ_DIR)/%.o: %.m
 	@mkdir -p $(dir $@)
 	@echo "Compiling $<..."
 	$(CC) $(CFLAGS) -c $< -o $@

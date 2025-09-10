@@ -1,14 +1,20 @@
-#include <string.h>
+#define _CRT_SECURE_NO_WARNINGS
 #include "game.h"
-#include "utils.h"
 #include "audio.h"
 
 void game_update(
-    GameState* game_state,
-    RendererState* renderer_state,
-    InputState* input_state,
-    AudioState* audio_state
+    GameState* game_state_in,
+    RendererState* renderer_state_in,
+    InputState* input_state_in,
+    AudioState* audio_state_in
 ) {
+    if (game_state_in != game_state) {
+        game_state = game_state_in;
+        renderer_state = renderer_state_in;
+        input_state = input_state_in;
+        audio_state = audio_state_in;
+    }
+
     game_state->camera_position.x = 160;
     game_state->camera_position.y = 90;
     draw_sprite(SPRITE_DICE, vec2(0, 0));

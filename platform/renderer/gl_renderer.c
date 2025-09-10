@@ -9,7 +9,7 @@
 typedef BOOL (WINAPI * PFNWGLSWAPINTERVALEXTPROC) (int interval);
 static PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT = NULL;
 
-internal bool gl_platform_init_vsync() {
+static bool gl_platform_init_vsync() {
     wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC)wglGetProcAddress("wglSwapIntervalEXT");
     if (wglSwapIntervalEXT) {
         debug_print("  WGL_EXT_swap_control extension loaded\n");
@@ -19,7 +19,7 @@ internal bool gl_platform_init_vsync() {
     return false;
 }
 
-internal bool gl_platform_set_vsync(bool enable) {
+static bool gl_platform_set_vsync(bool enable) {
     if (wglSwapIntervalEXT) {
         BOOL result = wglSwapIntervalEXT(enable ? 1 : 0);
         return result == TRUE;
@@ -41,7 +41,7 @@ static PFNGLXSWAPINTERVALSGIPROC glXSwapIntervalSGI = NULL;
 static Display* display = NULL;
 static GLXDrawable drawable = 0;
 
-internal bool gl_platform_init_vsync() {
+static bool gl_platform_init_vsync() {
     display = glXGetCurrentDisplay();
     drawable = glXGetCurrentDrawable();
     
@@ -75,7 +75,7 @@ internal bool gl_platform_init_vsync() {
     return false;
 }
 
-internal bool gl_platform_set_vsync(bool enable) {
+static bool gl_platform_set_vsync(bool enable) {
     int interval = enable ? 1 : 0;
     
     if (glXSwapIntervalEXT && display && drawable) {
@@ -99,13 +99,13 @@ internal bool gl_platform_set_vsync(bool enable) {
 #elif defined(__APPLE__)
 #include <OpenGL/OpenGL.h>
 
-internal bool gl_platform_init_vsync() {
+static bool gl_platform_init_vsync() {
     // macOS Core OpenGL always supports VSync control
     debug_print("  macOS Core OpenGL VSync support available\n");
     return true;
 }
 
-internal bool gl_platform_set_vsync(bool enable) {
+static bool gl_platform_set_vsync(bool enable) {
     CGLContextObj context = CGLGetCurrentContext();
     if (!context) {
         debug_print("  Warning: No current OpenGL context on macOS\n");
@@ -125,18 +125,18 @@ internal bool gl_platform_set_vsync(bool enable) {
 
 #else
 // Default implementation for unsupported platforms
-internal bool gl_platform_init_vsync() {
+static bool gl_platform_init_vsync() {
     debug_print("  Warning: VSync not implemented for this platform\n");
     return false;
 }
 
-internal bool gl_platform_set_vsync(bool enable) {
+static bool gl_platform_set_vsync(bool enable) {
     debug_print("  Warning: VSync not supported on this platform\n");
     return false;
 }
 #endif
 
-internal struct {
+static struct {
     InputState* input_state;
     RendererState* renderer_state;
 
@@ -152,7 +152,7 @@ internal struct {
     bool vsync_supported;
 } gl_context;
 
-internal void APIENTRY gl_debug_callback(
+static void APIENTRY gl_debug_callback(
     [[maybe_unused]] GLenum source,
     [[maybe_unused]] GLenum type,
     [[maybe_unused]] GLuint id,
@@ -173,7 +173,7 @@ internal void APIENTRY gl_debug_callback(
     debug_print("%s\n", message);
 }
 
-internal GLuint create_shader(
+static GLuint create_shader(
     GLenum shader_type,
     const char* source,
     usize source_size
@@ -198,7 +198,7 @@ internal GLuint create_shader(
     return shader;
 }
 
-internal GLuint load_texture(const uint8* png_data, usize png_size) {
+static GLuint load_texture(const uint8* png_data, usize png_size) {
     GLuint texture;
     glCreateTextures(GL_TEXTURE_2D, 1, &texture);
 
@@ -357,20 +357,3 @@ void renderer_cleanup() {
     glDeleteTextures(1, &gl_context.texture);
 }
 
-void draw_sprite(SpriteID sprite_id, Vec2 pos) {
-    assert(gl_context.renderer_state->transform_count + 1 <= MAX_TRANSFORMS
-           && "Max transform count reached");
-
-    Sprite sprite = get_sprite(sprite_id);
-
-    Vec2 sprite_size = vec2iv2(sprite.size);
-
-    Transform transform = {
-        .atlas_offset = sprite.atlas_offset,
-        .sprite_size = sprite.size,
-        .pos = vec2_div(vec2_minus(pos, sprite_size), 2.0f),
-        .size = sprite_size,
-    };
-
-    gl_context.renderer_state->transforms[gl_context.renderer_state->transform_count++] = transform;
-}

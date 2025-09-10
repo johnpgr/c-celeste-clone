@@ -46,4 +46,21 @@ bool renderer_init(InputState* input_state, RendererState* renderer_state);
 void renderer_set_vsync(bool enable);
 void renderer_cleanup(void);
 void renderer_render();
-void draw_sprite(SpriteID sprite_id, Vec2 pos);
+
+static void draw_sprite(SpriteID sprite_id, Vec2 pos) {
+    assert(renderer_state->transform_count + 1 <= MAX_TRANSFORMS
+           && "Max transform count reached");
+
+    Sprite sprite = get_sprite(sprite_id);
+
+    Vec2 sprite_size = vec2iv2(sprite.size);
+
+    Transform transform = {
+        .atlas_offset = sprite.atlas_offset,
+        .sprite_size = sprite.size,
+        .pos = vec2_div(vec2_minus(pos, sprite_size), 2.0f),
+        .size = sprite_size,
+    };
+
+    renderer_state->transforms[renderer_state->transform_count++] = transform;
+}

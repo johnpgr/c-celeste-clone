@@ -17,7 +17,7 @@ static struct {
     bool is_resizable;
 } win32_window;
 
-internal bool init_opengl_context() {
+static bool init_opengl_context() {
     debug_print("  Initializing OpenGL context.\n");
 
     PIXELFORMATDESCRIPTOR pfd = {
@@ -80,7 +80,7 @@ internal bool init_opengl_context() {
     return true;
 }
 
-internal void win32_fill_input_lookup_table() {
+static void win32_fill_input_lookup_table() {
     keycode_lookup_table[VK_LBUTTON] = KEY_MOUSE_LEFT;
     keycode_lookup_table[VK_MBUTTON] = KEY_MOUSE_MIDDLE;
     keycode_lookup_table[VK_RBUTTON] = KEY_MOUSE_RIGHT;

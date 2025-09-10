@@ -33,7 +33,7 @@ static struct {
     uint32 running_write_pos;  // next byte offset to write into secondary buffer
 } win32_audio;
 
-internal void ring_buffer_init(RingBuffer* rb, usize capacity) {
+static void ring_buffer_init(RingBuffer* rb, usize capacity) {
     rb->data = calloc(capacity, sizeof(int16));
     rb->capacity = capacity;
     rb->write_pos = 0;
@@ -42,13 +42,13 @@ internal void ring_buffer_init(RingBuffer* rb, usize capacity) {
     InitializeCriticalSection(&rb->mutex);
 }
 
-internal void ring_buffer_destroy(RingBuffer* rb) {
+static void ring_buffer_destroy(RingBuffer* rb) {
     DeleteCriticalSection(&rb->mutex);
     free(rb->data);
     rb->data = nullptr;
 }
 
-internal usize ring_buffer_write(RingBuffer* rb, const int16* data, usize samples) {
+static usize ring_buffer_write(RingBuffer* rb, const int16* data, usize samples) {
     EnterCriticalSection(&rb->mutex);
     
     usize space_available = rb->capacity - rb->available;
@@ -65,7 +65,7 @@ internal usize ring_buffer_write(RingBuffer* rb, const int16* data, usize sample
     return samples_to_write;
 }
 
-internal usize ring_buffer_read(RingBuffer* rb, int16* data, usize samples) {
+static usize ring_buffer_read(RingBuffer* rb, int16* data, usize samples) {
     EnterCriticalSection(&rb->mutex);
     
     usize samples_to_read = (samples < rb->available) ? samples : rb->available;
@@ -81,7 +81,7 @@ internal usize ring_buffer_read(RingBuffer* rb, int16* data, usize samples) {
     return samples_to_read;
 }
 
-internal DWORD WINAPI audio_thread_proc(LPVOID param) {
+static DWORD WINAPI audio_thread_proc(LPVOID param) {
     AudioState* audio_state = (AudioState*)param;
 
     while (!win32_audio.should_stop) {
