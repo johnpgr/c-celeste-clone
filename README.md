@@ -23,8 +23,6 @@ make
 
 # Release build
 make release
-  - **Linux**: X11, OpenGL, PulseAudio development libraries
-  - **macOS**: Xcode command line tools
 
 ### Build Commands
 
