@@ -36,9 +36,6 @@ void game_update(
         input_state = input_state_in;
         audio_state = audio_state_in;
     }
-
-    game_state->camera_position.x = 160;
-    game_state->camera_position.y = 90;
     draw_sprite(SPRITE_DICE, vec2iv2(game_state->player_position));
 
     if (is_down(QUIT)) {

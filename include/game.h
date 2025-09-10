@@ -38,7 +38,6 @@ typedef struct {
 typedef struct {
     bool should_quit;
     bool fps_cap;
-    Vec2 camera_position;
     IVec2 player_position;
 
     KeyMapping key_mappings[GAME_INPUT_COUNT];
@@ -65,7 +64,6 @@ static GameState* create_game_state(Arena* arena) {
     memset(state, 0, sizeof(GameState));
 
     state->fps_cap = true;
-    state->camera_position = vec2(0.0, 0.0);
     state->player_position = ivec2(0, 0);
     for (int i = 0; i < GAME_INPUT_COUNT; i++) {
         state->key_mappings[i].keys.capacity = 3;
