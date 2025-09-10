@@ -1,16 +1,9 @@
 /**
  * TODO:
  * - Save game locations
- * - Getting a handle to our executable file
- * - Asset loading path
  * - Threading (launch a thread)
- * - Raw input (Support for multiple keyboard)
- * - Sleep/timeBeginPeriod
- * - ClipCursor() (For multi monitor support)
  * - Fullscreen support
  * - WM_SETCURSOR (control cursor visibility)
- * - QueryCancelAutoplay
- * - WM_ACTIVATEAPP (for when we are not the main application)
 */
 #pragma once
 #include "def.h"

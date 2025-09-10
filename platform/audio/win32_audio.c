@@ -1,6 +1,7 @@
 #include <windows.h>
 #include <dsound.h>
 #include "platform_audio.h"
+#include "audio.h"
 
 #define NUM_BUFFERS 3
 
@@ -14,7 +15,6 @@ typedef struct {
 } RingBuffer;
 
 static struct {
-    AudioState* audio_state;
     LPDIRECTSOUND dsound;
     LPDIRECTSOUNDBUFFER primary_buffer;
     LPDIRECTSOUNDBUFFER secondary_buffer;
@@ -144,9 +144,9 @@ static DWORD WINAPI audio_thread_proc(LPVOID param) {
                        (samples_in_region1 - samples_read) * sizeof(int16));
             }
 
-            if (win32_audio.audio_state->volume != 1.0f && samples_read > 0) {
+            if (audio_state->volume != 1.0f && samples_read > 0) {
                 for (uint32 i = 0; i < samples_read; i++) {
-                    audio_data[i] = (int16)((real32)audio_data[i] * win32_audio.audio_state->volume);
+                    audio_data[i] = (int16)((real32)audio_data[i] * audio_state->volume);
                 }
             }
         }
@@ -166,9 +166,9 @@ static DWORD WINAPI audio_thread_proc(LPVOID param) {
                        (samples_in_region2 - samples_read) * sizeof(int16));
             }
 
-            if (win32_audio.audio_state->volume != 1.0f && samples_read > 0) {
+            if (audio_state->volume != 1.0f && samples_read > 0) {
                 for (uint32 i = 0; i < samples_read; i++) {
-                    audio_data[i] = (int16)((real32)audio_data[i] * win32_audio.audio_state->volume);
+                    audio_data[i] = (int16)((real32)audio_data[i] * audio_state->volume);
                 }
             }
         }
@@ -186,9 +186,8 @@ static DWORD WINAPI audio_thread_proc(LPVOID param) {
     return 0;
 }
 
-void platform_audio_init(AudioState* audio_state) {
+void platform_audio_init() {
     memset(&win32_audio, 0, sizeof(win32_audio));
-    win32_audio.audio_state = audio_state;
 
     usize ring_buffer_capacity = AUDIO_SAMPLE_RATE * AUDIO_CHANNELS;
     ring_buffer_init(&win32_audio.ring_buffer, ring_buffer_capacity);
@@ -337,13 +336,13 @@ void platform_audio_init(AudioState* audio_state) {
 }
 
 void platform_audio_update_buffer() {
-    if (!win32_audio.initialized || !win32_audio.audio_state) {
+    if (!win32_audio.initialized || !audio_state) {
         return;
     }
     
     usize samples_written = ring_buffer_write(
         &win32_audio.ring_buffer,
-        win32_audio.audio_state->audio,
+        audio_state->audio,
         AUDIO_CAPACITY
     );
     
@@ -357,7 +356,7 @@ void platform_audio_update_buffer() {
 void platform_audio_set_volume(real32 volume) {
     if (volume < 0.0f) volume = 0.0f;
     if (volume > 1.0f) volume = 1.0f;
-    win32_audio.audio_state->volume = volume;
+    audio_state->volume = volume;
 }
 
 void platform_audio_cleanup(void) {

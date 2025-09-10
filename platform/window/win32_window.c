@@ -1,15 +1,12 @@
 #include <windows.h>
 #include <windowsx.h>
 #include "def.h"
-#include "game.h"
 #include "window.h"
 #include "input.h"
 #include "utils.h"
 #include "glad/glad.h"
 
 static struct {
-    InputState* input_state;
-    RendererState* renderer_state;
     HWND hwnd;
     HDC hdc;
     HGLRC hglrc;
@@ -210,7 +207,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         case WM_SYSKEYUP: {
             bool is_down = (uMsg == WM_KEYDOWN) || (uMsg == WM_SYSKEYDOWN) || (uMsg == WM_LBUTTONDOWN);
             KeyCode keycode = keycode_lookup_table[wParam];
-            Key* key = &win32_window.input_state->keys[keycode];
+            Key* key = &input_state->keys[keycode];
             key->just_pressed = !key->just_pressed && !key->is_down && is_down;
             key->just_released = !key->just_released && key->is_down && !is_down;
             key->is_down = is_down;
@@ -228,15 +225,15 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 (uMsg == WM_MBUTTONDOWN || uMsg == WM_MBUTTONUP) ? VK_MBUTTON : VK_RBUTTON;
 
             KeyCode keycode = keycode_lookup_table[mousecode];
-            Key* key = &win32_window.input_state->keys[keycode];
+            Key* key = &input_state->keys[keycode];
             key->just_pressed = !key->just_pressed && !key->is_down && is_down;
             key->just_released = !key->just_released && key->is_down && !is_down;
             key->is_down = is_down;
             key->half_transition_count++;
         } break;
         case WM_SIZE:
-            win32_window.input_state->screen_size.x = LOWORD(lParam);
-            win32_window.input_state->screen_size.y = HIWORD(lParam);
+            input_state->screen_size.x = LOWORD(lParam);
+            input_state->screen_size.y = HIWORD(lParam);
 
             break;
         default:
@@ -249,10 +246,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 /**
  * @brief Initialize the window system with a game instance
  */
-void window_init(InputState* input_state, RendererState* renderer_state) {
-    win32_window.input_state = input_state;
-    win32_window.renderer_state = renderer_state;
-
+void window_init() {
     debug_print("Initializing window system...\n");
     debug_print("  Title: %s\n", TITLE);
 
@@ -372,9 +366,9 @@ bool window_should_close(void) {
  */
 void window_poll_events(void) {
     for (int keycode = 0; keycode < KEY_COUNT; keycode++) {
-        win32_window.input_state->keys[keycode].just_pressed = false;
-        win32_window.input_state->keys[keycode].just_released = false;
-        win32_window.input_state->keys[keycode].half_transition_count = 0;
+        input_state->keys[keycode].just_pressed = false;
+        input_state->keys[keycode].just_released = false;
+        input_state->keys[keycode].half_transition_count = 0;
     }
 
     MSG msg;
@@ -388,18 +382,18 @@ void window_poll_events(void) {
     GetCursorPos(&cursor_pos);
     ScreenToClient(win32_window.hwnd, &cursor_pos);
 
-    win32_window.input_state->mouse_pos_prev = win32_window.input_state->mouse_pos;
-    win32_window.input_state->mouse_pos.x = cursor_pos.x;
-    win32_window.input_state->mouse_pos.y = cursor_pos.y;
-    win32_window.input_state->mouse_delta = ivec2_minus(
-        win32_window.input_state->mouse_pos,
-        win32_window.input_state->mouse_pos_prev
+    input_state->mouse_pos_prev = input_state->mouse_pos;
+    input_state->mouse_pos.x = cursor_pos.x;
+    input_state->mouse_pos.y = cursor_pos.y;
+    input_state->mouse_delta = ivec2_minus(
+        input_state->mouse_pos,
+        input_state->mouse_pos_prev
     );
 
-    win32_window.input_state->mouse_pos_world = screen_to_world(
-        win32_window.input_state,
-        win32_window.renderer_state,
-        win32_window.input_state->mouse_pos
+    input_state->mouse_pos_world = screen_to_world(
+        input_state,
+        renderer_state,
+        input_state->mouse_pos
     );
 }
 

@@ -49,8 +49,6 @@ endif
 # ==============================================================================
 
 BUILD_MODE_DIR := $(BUILD_DIR)/$(BUILD_MODE)
-OBJ_DIR := $(BUILD_MODE_DIR)/obj
-BIN_DIR := $(BUILD_MODE_DIR)/bin
 
 # ==============================================================================
 # Compiler Configuration
@@ -99,10 +97,10 @@ SRC := $(MAIN_SRC)
 # ==============================================================================
 
 # Convert source files to object file paths
-OBJ := $(addprefix $(OBJ_DIR)/,$(notdir $(patsubst %.c,%.o,$(filter %.c,$(SRC)))))
+OBJ := $(addprefix $(BUILD_MODE_DIR)/,$(notdir $(patsubst %.c,%.o,$(filter %.c,$(SRC)))))
 
 # Game DLL object files
-GAME_OBJ := $(addprefix $(OBJ_DIR)/,$(notdir $(patsubst %.c,%.o,$(GAME_SRC))))
+GAME_OBJ := $(addprefix $(BUILD_MODE_DIR)/,$(notdir $(patsubst %.c,%.o,$(GAME_SRC))))
 
 # Dependency files for incremental builds
 DEPS := $(OBJ:.o=.d) $(GAME_OBJ:.o=.d)
@@ -111,17 +109,17 @@ DEPS := $(OBJ:.o=.d) $(GAME_OBJ:.o=.d)
 # Target Definitions
 # ==============================================================================
 
-TARGET := $(BIN_DIR)/$(PROJECT_NAME)$(TARGET_SUFFIX)
+TARGET := $(BUILD_MODE_DIR)/$(PROJECT_NAME)$(TARGET_SUFFIX)
 
 # Game dynamic library
 ifeq ($(PLATFORM), win32)
-    GAME_DLL := $(BIN_DIR)/game.dll
+    GAME_DLL := $(BUILD_MODE_DIR)/game.dll
     GAME_DLL_FLAGS := -shared
 else ifeq ($(PLATFORM), osx)
-    GAME_DLL := $(BIN_DIR)/game.dylib
+    GAME_DLL := $(BUILD_MODE_DIR)/game.dylib
     GAME_DLL_FLAGS := -shared -fPIC
 else ifeq ($(PLATFORM), linux)
-    GAME_DLL := $(BIN_DIR)/game.so
+    GAME_DLL := $(BUILD_MODE_DIR)/game.so
     GAME_DLL_FLAGS := -shared -fPIC
 endif
 
@@ -148,8 +146,8 @@ $(TARGET): $(OBJ)
 	@echo "Build complete: $@"
 
 ifeq ($(PLATFORM), win32)
-GAME_DLL_TIMESTAMP := $(BIN_DIR)/game_$(shell powershell -Command "[int]([datetime]::UtcNow - (Get-Date '1970-01-01 00:00:00Z')).TotalSeconds").dll
-GAME_PDB := $(BIN_DIR)/game.pdb
+GAME_DLL_TIMESTAMP := $(BUILD_MODE_DIR)/game_$(shell powershell -Command "[int]([datetime]::UtcNow - (Get-Date '1970-01-01 00:00:00Z')).TotalSeconds").dll
+GAME_PDB := $(BUILD_MODE_DIR)/game.pdb
 
 # Game dynamic library compilation
 $(GAME_DLL): $(GAME_OBJ)
@@ -169,7 +167,7 @@ endif
 VPATH := src
 
 # C source compilation
-$(OBJ_DIR)/%.o: %.c
+$(BUILD_MODE_DIR)/%.o: %.c
 	@mkdir -p $(dir $@)
 	@echo "Compiling $<..."
 	$(CC) $(CFLAGS) -c $< -o $@

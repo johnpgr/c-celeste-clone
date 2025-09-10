@@ -19,6 +19,8 @@
 #include "../platform/dynlib/osx_dynlib.c"
 #endif
 
+#include "game.h"
+
 typedef void GameUpdateFn(GameState*, RendererState*, InputState*, AudioState*);
 static GameUpdateFn* game_update_ptr;
 
@@ -92,9 +94,9 @@ int main(int argc, [[maybe_unused]] char* argv[argc + 1]) {
     input_state = create_input_state(&permanent_storage);
     audio_state = create_audio_state(&permanent_storage);
 
-    window_init(input_state, renderer_state);
-    platform_audio_init(audio_state);
-    renderer_init(input_state, renderer_state);
+    window_init();
+    platform_audio_init();
+    renderer_init();
     renderer_set_vsync(false);
 
     static uint8 background_ogg_source[] = {

@@ -4,14 +4,12 @@
  */
 #pragma once
 #include "def.h"
-#include "consts.h"
-#include "audio.h"
 
 /**
  * @brief Initializes the audio system.
  * @param game A pointer to the game instance.
  */
-void platform_audio_init(AudioState* audio_state);
+void platform_audio_init();
 
 /**
  * @brief Shuts down the audio system and releases resources.

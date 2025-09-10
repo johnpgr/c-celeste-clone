@@ -1,6 +1,4 @@
 #pragma once
-#include "input.h"
-#include "renderer.h"
 
 /**
  * @brief Initialize the window system with a game instance
@@ -8,7 +6,7 @@
  * 
  * Creates the application delegate and sets up the Cocoa application.
  */
-void window_init(InputState* input_state, RendererState* renderer_state);
+void window_init();
 
 /**
  * @brief Clean up window resources

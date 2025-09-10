@@ -61,7 +61,7 @@ static void draw_sprite(SpriteID sprite_id, Vec2 pos) {
 }
 
 // Functions provided by the platform renderer
-bool renderer_init(InputState* input_state, RendererState* renderer_state);
+bool renderer_init();
 void renderer_set_vsync(bool enable);
 void renderer_cleanup(void);
 void renderer_render();

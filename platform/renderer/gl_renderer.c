@@ -2,7 +2,6 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #include "renderer.h"
-#include "input.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -137,9 +136,6 @@ static bool gl_platform_set_vsync(bool enable) {
 #endif
 
 static struct {
-    InputState* input_state;
-    RendererState* renderer_state;
-
     GLuint program;
     GLuint vert_shader;
     GLuint frag_shader;
@@ -224,10 +220,7 @@ static GLuint load_texture(const uint8* png_data, usize png_size) {
     return texture;
 }
 
-bool renderer_init(InputState* input_state, RendererState* renderer_state) {
-    gl_context.input_state = input_state;
-    gl_context.renderer_state = renderer_state;
-
+bool renderer_init() {
     glDebugMessageCallback(&gl_debug_callback, nullptr);
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
     glEnable(GL_DEBUG_OUTPUT);
@@ -283,7 +276,7 @@ bool renderer_init(InputState* input_state, RendererState* renderer_state) {
     glNamedBufferData(
         gl_context.SBO,
         sizeof(Transform) * MAX_TRANSFORMS,
-        gl_context.renderer_state->transforms,
+        renderer_state->transforms,
         GL_DYNAMIC_DRAW
     );
 
@@ -307,14 +300,14 @@ void renderer_render() {
     glClearColor(RGBA(181, 101, 174, 255));
     glClearDepth(0.0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glViewport(0, 0, gl_context.input_state->screen_size.x, gl_context.input_state->screen_size.y);
+    glViewport(0, 0, input_state->screen_size.x, input_state->screen_size.y);
     glUniform2fv(
         gl_context.screen_size,
         1,
-        (real32[]){gl_context.input_state->screen_size.x, gl_context.input_state->screen_size.y}
+        (real32[]){input_state->screen_size.x, input_state->screen_size.y}
     );
 
-    OrthographicCamera2D camera = gl_context.renderer_state->game_camera;
+    OrthographicCamera2D camera = renderer_state->game_camera;
     Mat4x4 camera_matrix = create_orthographic(
         camera.position.x - camera.dimensions.x / 2.0,
         camera.position.x + camera.dimensions.x / 2.0,
@@ -326,18 +319,18 @@ void renderer_render() {
     glNamedBufferSubData(
         gl_context.SBO,
         0,
-        sizeof(Transform) * gl_context.renderer_state->transform_count,
-        gl_context.renderer_state->transforms
+        sizeof(Transform) * renderer_state->transform_count,
+        renderer_state->transforms
     );
 
     glDrawArraysInstanced(
         GL_TRIANGLES,
         0,
         6,
-        gl_context.renderer_state->transform_count
+        renderer_state->transform_count
     );
 
-    gl_context.renderer_state->transform_count = 0;
+    renderer_state->transform_count = 0;
 }
 
 void renderer_set_vsync(bool enable) {
