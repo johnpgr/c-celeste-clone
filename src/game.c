@@ -17,7 +17,7 @@ void game_update(
 
     game_state->camera_position.x = 160;
     game_state->camera_position.y = 90;
-    draw_sprite(SPRITE_DICE, vec2(0, 0));
+    draw_sprite(SPRITE_DICE, vec2(10, 0));
 };
 
 void game_key_up([[maybe_unused]] int key) {

@@ -35,21 +35,21 @@ static void reload_game_dll(Arena* transient_storage) {
     static void* game_dll;
     static uint64 game_dll_timestamp;
 
-    uint64 current_dll_timestamp = file_get_timestamp("game.dll");
+    uint64 current_dll_timestamp = file_get_timestamp(DYNLIB("game"));
 
     if (current_dll_timestamp > game_dll_timestamp) {
         if (game_dll) {
             dynlib_close(game_dll);
             game_dll = nullptr;
-            debug_print("Unloaded old game.dll\n");
+            debug_print("Unloaded old game dynlib\n");
         }
 
-        while (!copy_file(transient_storage, "game.dll", "game_load.dll")) {
+        while (!copy_file(transient_storage, DYNLIB("game"), DYNLIB("game_load"))) {
             sleep_nanos(10 * NANOS_PER_MILLI);
         }
 
-        game_dll = dynlib_open("game_load.dll");
-        assert(game_dll != nullptr && "Failed to load game.dll");
+        game_dll = dynlib_open(DYNLIB("game_load"));
+        assert(game_dll != nullptr && "Failed to load game dynlib");
 
         game_update_ptr = (GameUpdateFn*)dynlib_get_symbol(game_dll, "game_update");
         assert(game_update_ptr != nullptr && "Failed to load update_game function");

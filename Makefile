@@ -64,20 +64,22 @@ CFLAGS := $(BASE_CFLAGS) $(OPTIMIZATION_FLAGS) $(INCLUDE_FLAGS)
 # ==============================================================================
 # Platform-Specific Linker Configuration
 # ==============================================================================
+#
+LDFLAGS := -fuse-ld=lld
 
 ifeq ($(PLATFORM), osx)
     LDLIBS := -framework Cocoa -framework AudioToolbox -framework OpenGL
+    LDFLAGS += -Wl,--no-implib
     TARGET_SUFFIX :=
 else ifeq ($(PLATFORM), linux)
     LDLIBS := -lX11 -lXext -lm -lpulse -lpulse-simple -lGL
+    LDFLAGS += -Wl,--no-implib
     TARGET_SUFFIX :=
 else ifeq ($(PLATFORM), win32)
     LDLIBS := -lgdi32 -luser32 -ldsound -lopengl32
-    LDFLAGS := -Wl,/SUBSYSTEM:WINDOWS
+    LDFLAGS += -Wl,/SUBSYSTEM:WINDOWS -Wl,/NOIMPLIB
     TARGET_SUFFIX := .exe
 endif
-
-LDFLAGS += -fuse-ld=lld
 
 # ==============================================================================
 # Source File Configuration - Two Translation Units
@@ -147,14 +149,16 @@ $(TARGET): $(OBJ)
 
 ifeq ($(PLATFORM), win32)
 GAME_DLL_TIMESTAMP := $(BIN_DIR)/game_$(shell powershell -Command "[int]([datetime]::UtcNow - (Get-Date '1970-01-01 00:00:00Z')).TotalSeconds").dll
+GAME_PDB := $(BIN_DIR)/game.pdb
 
 # Game dynamic library compilation
 $(GAME_DLL): $(GAME_OBJ)
 	@mkdir -p $(dir $@)
 	@echo "Building game dynamic library..."
-	$(CC) $(GAME_OBJ) -o $(GAME_DLL_TIMESTAMP) $(GAME_DLL_FLAGS) $(LINK_DEBUG_FLAGS) $(LDLIBS)
+	$(CC) $(GAME_OBJ) -o $(GAME_DLL_TIMESTAMP) $(GAME_DLL_FLAGS) $(LDFLAGS) $(LINK_DEBUG_FLAGS) -Wl,/PDB:$(GAME_PDB) $(LDLIBS)
 	@cp -f $(GAME_DLL_TIMESTAMP) $(GAME_DLL)
-	@echo "Game DLL complete: $@"
+	@rm -f $(GAME_DLL_TIMESTAMP)
+	@echo "Game DLL complete: $@ (PDB: $(GAME_PDB))"
 endif
 
 # ==============================================================================
