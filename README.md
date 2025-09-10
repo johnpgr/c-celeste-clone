@@ -24,15 +24,6 @@ make
 # Release build
 make release
 
-### Build Commands
-
-```bash
-# Debug build (default)
-make
-
-# Release build
-make release
-
 # Build and run
 make run
 
