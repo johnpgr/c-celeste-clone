@@ -83,9 +83,15 @@ LDFLAGS += -fuse-ld=lld
 # Source File Discovery
 # ==============================================================================
 
+# Renderer implementation
+RENDERER_USED := gl
+
 # Main application source files
 # MAIN_SRC := $(wildcard src/*.c)
 MAIN_SRC := src/main.c
+
+# Game source files for dynamic library
+GAME_SRC := src/game.c
 
 # External library source files
 EXTERNAL_SRC := $(wildcard external/*.c)
@@ -103,6 +109,9 @@ endif
 # Combined source files
 SRC := $(MAIN_SRC) $(EXTERNAL_SRC) $(PLATFORM_SRC)
 
+# Add renderer source file based on selected renderer
+SRC += $(PLATFORM_DIR)/renderer/$(RENDERER_USED)_renderer.c
+
 # ==============================================================================
 # Object File and Dependency Generation
 # ==============================================================================
@@ -110,6 +119,9 @@ SRC := $(MAIN_SRC) $(EXTERNAL_SRC) $(PLATFORM_SRC)
 # Convert source files to object file paths
 OBJ := $(addprefix $(OBJ_DIR)/,$(notdir $(patsubst %.c,%.o,$(filter %.c,$(SRC))))) \
        $(addprefix $(OBJ_DIR)/,$(notdir $(patsubst %.m,%.o,$(filter %.m,$(SRC)))))
+
+# Game DLL object files
+GAME_OBJ := $(addprefix $(OBJ_DIR)/,$(notdir $(patsubst %.c,%.o,$(GAME_SRC))))
 
 # Dependency files for incremental builds
 DEPS := $(OBJ:.o=.d)
@@ -127,17 +139,32 @@ TARGET := $(BIN_DIR)/$(PROJECT_NAME)$(TARGET_SUFFIX)
 EXTERNAL_LIB := $(LIB_DIR)/libexternal.a
 PLATFORM_LIB := $(LIB_DIR)/libplatform.a
 
+# Game dynamic library
+ifeq ($(PLATFORM), win32)
+    GAME_DLL := $(BIN_DIR)/game.dll
+    GAME_DLL_FLAGS := -shared
+else ifeq ($(PLATFORM), osx)
+    GAME_DLL := $(BIN_DIR)/game.dylib
+    GAME_DLL_FLAGS := -shared -fPIC
+else ifeq ($(PLATFORM), linux)
+    GAME_DLL := $(BIN_DIR)/game.so
+    GAME_DLL_FLAGS := -shared -fPIC
+endif
+
 # ==============================================================================
 # Build Rules
 # ==============================================================================
 
-.PHONY: all build run clean release help
+.PHONY: all build run clean release help game-dll
 
 # Default target
-all: build
+all: build game-dll
 
 # Main build target
 build: $(TARGET)
+
+# Game DLL target
+game-dll: $(GAME_DLL)
 
 # Final executable linking
 $(TARGET): $(MAIN_OBJ) $(EXTERNAL_LIB) $(PLATFORM_LIB)
@@ -157,6 +184,17 @@ $(PLATFORM_LIB): $(PLATFORM_OBJ)
 	@mkdir -p $(LIB_DIR)
 	@echo "Creating platform library..."
 	ar rcs $@ $^
+
+# Game dynamic library compilation
+$(GAME_DLL): $(GAME_OBJ) $(EXTERNAL_LIB) $(PLATFORM_LIB)
+	@mkdir -p $(dir $@)
+	@echo "Building game dynamic library..."
+ifeq ($(PLATFORM), win32)
+	$(CC) $(GAME_OBJ) $(EXTERNAL_LIB) $(PLATFORM_LIB) -o $@ $(GAME_DLL_FLAGS) $(LINK_DEBUG_FLAGS) $(LDLIBS)
+else
+	$(CC) $(GAME_OBJ) $(EXTERNAL_LIB) $(PLATFORM_LIB) -o $@ $(GAME_DLL_FLAGS) $(LDFLAGS) $(LINK_DEBUG_FLAGS) $(LDLIBS)
+endif
+	@echo "Game DLL complete: $@"
 
 # ==============================================================================
 # Compilation Rules
@@ -191,7 +229,7 @@ release:
 	$(MAKE) RELEASE=1
 
 # Build and run the application
-run: build
+run: build game-dll
 	@echo "Running $(PROJECT_NAME)..."
 	./$(TARGET)
 
@@ -204,6 +242,7 @@ clean:
 help:
 	@echo "Available targets:"
 	@echo "  build    - Build the project (default)"
+	@echo "  game-dll - Build the game dynamic library"
 	@echo "  release  - Build optimized release version"
 	@echo "  run      - Build and run the application"
 	@echo "  clean    - Remove all build artifacts"
@@ -213,3 +252,4 @@ help:
 	@echo "  Platform:    $(PLATFORM)"
 	@echo "  Build mode:  $(BUILD_MODE)"
 	@echo "  Target:      $(TARGET)"
+	@echo "  Game DLL:    $(GAME_DLL)"

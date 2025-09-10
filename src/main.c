@@ -5,39 +5,102 @@
 #include "arena.c"
 #include "assets.c"
 #include "math.c"
-#include "game.c"
-#include "gl_renderer.c"
 #include "log.c"
-#include "ogg.c"
+#include "audio.c"
 
 #include "window.h"
-#include "audio.h"
+#include "renderer.h"
+#include "platform_audio.h"
+#include "game.h"
+#include "utils.h"
+#include "file.h"
+#include "dynlib.h"
 
-inline void update_fps_counter(Game* game, uint64 current_time) {
-    game->frame_count++;
-    if(current_time - game->fps_timer_start >= NANOS_PER_SEC) {
-        game->current_fps = (real64)game->frame_count * NANOS_PER_SEC
-            / (current_time - game->fps_timer_start);
-        game->frame_count = 0;
-        game->fps_timer_start = current_time;
+typedef void GameUpdateFn(GameState*, RendererState*, InputState*, AudioState*);
+static GameUpdateFn* game_update_ptr;
+
+internal void game_update(
+    GameState *game_state,
+    RendererState *renderer_state,
+    InputState *input_state,
+    AudioState* audio_state
+) {
+    game_update_ptr(game_state, renderer_state, input_state, audio_state);
+}
+
+internal void reload_game_dll(Arena* transient_storage) {
+    static void* game_dll;
+    static uint64 game_dll_timestamp;
+
+    uint64 current_dll_timestamp = file_get_timestamp("game.dll");
+    if (current_dll_timestamp > game_dll_timestamp) {
+        if (game_dll) {
+            dynlib_close(game_dll);
+            game_dll = nullptr;
+            debug_print("Unloaded old game.dll\n");
+        }
+
+        while (!copy_file(transient_storage, "game.dll", "game_load.dll")) {
+            sleep_nanos(10 * NANOS_PER_MILLI);
+        }
+
+        game_dll = dynlib_open("game_load.dll");
+        assert(game_dll != nullptr && "Failed to load game.dll");
+
+        game_update_ptr = (GameUpdateFn*)dynlib_get_symbol(game_dll, "game_update");
+        assert(game_update_ptr != nullptr && "Failed to load update_game function");
+        game_dll_timestamp = current_dll_timestamp;
     }
 }
 
-int main(int argc, [[maybe_unused]] char* argv[argc + 1]) {
-    Game game = game_init();
+internal void print_arena_stats(Arena* permanent_storage, Arena* transient_storage) {
+    debug_print("Arena statistics:\n");
+    debug_print(
+        "  Permanent: %.1f/%.1f KB used (%.1f%%, %.1f KB remaining)\n",
+        arena_get_used(permanent_storage) / 1024.0f,
+        permanent_storage->size / 1024.0f,
+        (real32)arena_get_used(permanent_storage) / permanent_storage->size * 100.0f,
+        arena_get_remaining(permanent_storage) / 1024.0f
+    );
+    debug_print(
+        "  Transient: %.1f/%.1f KB used (%.1f%%, %.1f KB remaining)\n",
+        arena_get_used(transient_storage) / 1024.0f,
+        transient_storage->size / 1024.0f,
+        (real32)arena_get_used(transient_storage) / transient_storage->size * 100.0f,
+        arena_get_remaining(transient_storage) / 1024.0f
+    );
+}
 
-    window_init(&game, WORLD_WIDTH * 4, WORLD_HEIGHT * 4);
-    window_set_vsync(false);
-    audio_init(&game);
-    gl_init(&game);
+int main(int argc, [[maybe_unused]] char* argv[argc + 1]) {
+    debug_print("Initializing game...\n");
+    debug_print("  Audio: %d Hz, %zu channels, %zu capacity\n", AUDIO_SAMPLE_RATE, AUDIO_CHANNELS, AUDIO_CAPACITY);
+    debug_print("  FPS: %d\n", FPS);
+    debug_print("  Max audio sources: %d\n", MAX_AUDIO_SOURCES);
+
+    Arena permanent_storage = create_arena(MB(64));
+    Arena transient_storage = create_arena(MB(128));
+    debug_print("  Permanent arena: %.1f KB initialized\n", permanent_storage.size / 1024.0f);
+    debug_print("  Transient arena: %.1f KB initialized\n", transient_storage.size / 1024.0f);
+
+    // TODO: Maybe check if these allocations succeed
+    renderer_state = create_renderer_state(&permanent_storage);
+    game_state = create_game_state(&permanent_storage);
+    input_state = create_input_state(&permanent_storage);
+    audio_state = create_audio_state(&permanent_storage);
+
+    window_init(input_state, renderer_state);
+    platform_audio_init(audio_state);
+    renderer_init(input_state, renderer_state);
+    renderer_set_vsync(false);
 
     static uint8 background_ogg_source[] = {
         #embed "assets/sounds/Background.ogg"
     };
     usize background_ogg_size = sizeof(background_ogg_source);
 
-    AudioSource* background_ogg = load_ogg_static_from_memory(
-        &game,
+    AudioSource* background_ogg = create_audio_source_static_memory(
+        &permanent_storage,
+        audio_state,
         background_ogg_source,
         background_ogg_size,
         false
@@ -47,16 +110,17 @@ int main(int argc, [[maybe_unused]] char* argv[argc + 1]) {
         return -1;
     }
 
-    /* background_ogg->volume = 0.5f; */
-    /* game_play_audio_source(background_ogg); */
+    background_ogg->volume = 0.5f;
+    audio_source_play(background_ogg);
 
     static uint8 explosion_ogg_source[] = {
         #embed "assets/sounds/Explosion.ogg"
     };
     usize explosion_ogg_size = sizeof(explosion_ogg_source);
 
-    AudioSource* explosion_ogg = load_ogg_static_from_memory(
-        &game,
+    AudioSource* explosion_ogg = create_audio_source_static_memory(
+        &permanent_storage,
+        audio_state,
         explosion_ogg_source,
         explosion_ogg_size,
         false
@@ -67,11 +131,11 @@ int main(int argc, [[maybe_unused]] char* argv[argc + 1]) {
     }
     explosion_ogg->volume = 0.3f;
 
-    const uint64 NANOS_PER_UPDATE = NANOS_PER_SEC / game.fps;
+    const uint64 NANOS_PER_UPDATE = NANOS_PER_SEC / FPS;
     uint64 accumulator = 0;
     uint64 last_time = current_time_nanos();
 
-    window_show();
+    // window_show();
 
     // TODO: Separate render thread from main thread 
     // (for resizing, moving the window without stopping the render)
@@ -82,66 +146,36 @@ int main(int argc, [[maybe_unused]] char* argv[argc + 1]) {
         last_time = current_time;
         accumulator += delta_time;
 
+        reload_game_dll(&transient_storage);
+
         window_poll_events();
-        
-        if (window_get_key_state(WINDOW_KEY_ESCAPE)) {
-            break;
-        }
-
-        // TODO: Improve this key handling
-        static bool space_was_pressed = false;
-        static bool f_was_pressed = false;
-        static bool m_was_pressed = false;
-        bool space_is_pressed = window_get_key_state(WINDOW_KEY_SPACE);
-        bool f_is_pressed = window_get_key_state(WINDOW_KEY_F);
-        bool m_is_pressed = window_get_key_state(WINDOW_KEY_M);
-        
-        if (space_is_pressed && !space_was_pressed) {
-            game_play_audio_source(explosion_ogg);
-        }
-        space_was_pressed = space_is_pressed;
-
-        if (f_is_pressed && !f_was_pressed) {
-            game.fps_cap = !game.fps_cap;
-            debug_print("Frameskipping %s\n", game.fps_cap ? "Enabled" : "Disabled");
-        }
-        f_was_pressed = f_is_pressed;
-
-        if (m_is_pressed && !m_was_pressed) {
-            static real32 saved_volume = 1.0f;
-            if (game.audio_volume > 0.0f) {
-                saved_volume = game.audio_volume;
-                game.audio_volume = 0.0f;
-            } else {
-                game.audio_volume = saved_volume;
-            }
-        }
-        m_was_pressed = m_is_pressed;
 
         while (accumulator >= NANOS_PER_UPDATE) {
-            game_generate_audio(&game);
-            audio_update_buffer(&game);
+            platform_audio_update_buffer();
             
-            if (game.fps_cap) {
-                update_fps_counter(&game, current_time);
-                game_update_and_render(&game);
+            if (game_state->fps_cap) {
+                game_update(game_state, renderer_state, input_state, audio_state);
+                renderer_render();
                 window_present();
             } 
             
             accumulator -= NANOS_PER_UPDATE;
         }
         
-        if (!game.fps_cap) {
-            update_fps_counter(&game, current_time);
-            game_update_and_render(&game);
+        if (!game_state->fps_cap) {
+            game_update(game_state, renderer_state, input_state, audio_state);
+            renderer_render();
             window_present();
         }
+
+        arena_reset(&transient_storage);
     }
 
-    game_cleanup(&game);
-    audio_cleanup();
+    platform_audio_cleanup();
     window_cleanup();
-    gl_cleanup();
+    renderer_cleanup();
+    arena_cleanup(&transient_storage);
+    arena_cleanup(&permanent_storage);
 
     return EXIT_SUCCESS;
 }

@@ -1,7 +1,8 @@
 #include <windows.h>
 #include <dsound.h>
-#include "audio.h"
-#include "game.h"
+#include "platform_audio.h"
+
+#define NUM_BUFFERS 3
 
 typedef struct {
     int16* data;
@@ -13,7 +14,7 @@ typedef struct {
 } RingBuffer;
 
 static struct {
-    Game* game;
+    AudioState* audio_state;
     LPDIRECTSOUND dsound;
     LPDIRECTSOUNDBUFFER primary_buffer;
     LPDIRECTSOUNDBUFFER secondary_buffer;
@@ -30,7 +31,7 @@ static struct {
     uint32 block_bytes;        // one "tick" worth in bytes (1/fps seconds)
     uint32 safety_bytes;       // how far ahead of the play cursor we keep filled
     uint32 running_write_pos;  // next byte offset to write into secondary buffer
-} Win32Audio;
+} win32_audio;
 
 internal void ring_buffer_init(RingBuffer* rb, usize capacity) {
     rb->data = calloc(capacity, sizeof(int16));
@@ -81,29 +82,29 @@ internal usize ring_buffer_read(RingBuffer* rb, int16* data, usize samples) {
 }
 
 internal DWORD WINAPI audio_thread_proc(LPVOID param) {
-    Game* game = (Game*)param;
+    AudioState* audio_state = (AudioState*)param;
 
-    while (!Win32Audio.should_stop) {
-        DWORD wait_ms = (game && game->fps) ? (DWORD)(1000 / game->fps) : 16;
-        WaitForSingleObject(Win32Audio.audio_event, wait_ms);
+    while (!win32_audio.should_stop) {
+        DWORD wait_ms = (DWORD)(1000 / FPS);
+        WaitForSingleObject(win32_audio.audio_event, wait_ms);
         
-        if (!Win32Audio.initialized || !game) {
+        if (!win32_audio.initialized || !audio_state) {
             continue;
         }
 
         DWORD play_pos = 0, write_pos_ignored = 0;
         HRESULT hr = IDirectSoundBuffer_GetCurrentPosition(
-            Win32Audio.secondary_buffer, &play_pos, &write_pos_ignored);
+            win32_audio.secondary_buffer, &play_pos, &write_pos_ignored);
         if (FAILED(hr)) {
             continue;
         }
 
-        const uint32 buffer_size = Win32Audio.buffer_size;
-        const uint32 block_align = Win32Audio.block_align;
-        const uint32 safety_bytes = Win32Audio.safety_bytes;
+        const uint32 buffer_size = win32_audio.buffer_size;
+        const uint32 block_align = win32_audio.block_align;
+        const uint32 safety_bytes = win32_audio.safety_bytes;
 
         uint32 target_write_pos = (play_pos + safety_bytes) % buffer_size;
-        uint32 running_write_pos = Win32Audio.running_write_pos;
+        uint32 running_write_pos = win32_audio.running_write_pos;
 
         uint32 bytes_to_write = (target_write_pos + buffer_size - running_write_pos) % buffer_size;
         // Align to frame boundary
@@ -117,7 +118,7 @@ internal DWORD WINAPI audio_thread_proc(LPVOID param) {
         DWORD audio_bytes1 = 0, audio_bytes2 = 0;
 
         hr = IDirectSoundBuffer_Lock(
-            Win32Audio.secondary_buffer,
+            win32_audio.secondary_buffer,
             running_write_pos,
             bytes_to_write,
             &audio_ptr1, &audio_bytes1,
@@ -133,7 +134,7 @@ internal DWORD WINAPI audio_thread_proc(LPVOID param) {
             uint32 samples_in_region1 = audio_bytes1 / sizeof(int16);
 
             usize samples_read = ring_buffer_read(
-                &Win32Audio.ring_buffer,
+                &win32_audio.ring_buffer,
                 audio_data,
                 samples_in_region1
             );
@@ -143,9 +144,9 @@ internal DWORD WINAPI audio_thread_proc(LPVOID param) {
                        (samples_in_region1 - samples_read) * sizeof(int16));
             }
 
-            if (game->audio_volume != 1.0f && samples_read > 0) {
+            if (win32_audio.audio_state->volume != 1.0f && samples_read > 0) {
                 for (uint32 i = 0; i < samples_read; i++) {
-                    audio_data[i] = (int16)((real32)audio_data[i] * game->audio_volume);
+                    audio_data[i] = (int16)((real32)audio_data[i] * win32_audio.audio_state->volume);
                 }
             }
         }
@@ -155,7 +156,7 @@ internal DWORD WINAPI audio_thread_proc(LPVOID param) {
             uint32 samples_in_region2 = audio_bytes2 / sizeof(int16);
 
             usize samples_read = ring_buffer_read(
-                &Win32Audio.ring_buffer,
+                &win32_audio.ring_buffer,
                 audio_data,
                 samples_in_region2
             );
@@ -165,45 +166,44 @@ internal DWORD WINAPI audio_thread_proc(LPVOID param) {
                        (samples_in_region2 - samples_read) * sizeof(int16));
             }
 
-            if (game->audio_volume != 1.0f && samples_read > 0) {
+            if (win32_audio.audio_state->volume != 1.0f && samples_read > 0) {
                 for (uint32 i = 0; i < samples_read; i++) {
-                    audio_data[i] = (int16)((real32)audio_data[i] * game->audio_volume);
+                    audio_data[i] = (int16)((real32)audio_data[i] * win32_audio.audio_state->volume);
                 }
             }
         }
 
         IDirectSoundBuffer_Unlock(
-            Win32Audio.secondary_buffer,
+            win32_audio.secondary_buffer,
             audio_ptr1, audio_bytes1,
             audio_ptr2, audio_bytes2
         );
 
-        Win32Audio.running_write_pos =
+        win32_audio.running_write_pos =
             (running_write_pos + bytes_to_write) % buffer_size;
     }
     
     return 0;
 }
 
-void audio_init(Game* game) {
-    memset(&Win32Audio, 0, sizeof(Win32Audio));
-    Win32Audio.game = game;
-    game->audio_volume = 1.0f;
+void platform_audio_init(AudioState* audio_state) {
+    memset(&win32_audio, 0, sizeof(win32_audio));
+    win32_audio.audio_state = audio_state;
+
+    usize ring_buffer_capacity = AUDIO_SAMPLE_RATE * AUDIO_CHANNELS;
+    ring_buffer_init(&win32_audio.ring_buffer, ring_buffer_capacity);
     
-    usize ring_buffer_capacity = game->audio_sample_rate * game->audio_channels;
-    ring_buffer_init(&Win32Audio.ring_buffer, ring_buffer_capacity);
-    
-    HRESULT hr = DirectSoundCreate(nullptr, &Win32Audio.dsound, nullptr);
+    HRESULT hr = DirectSoundCreate(nullptr, &win32_audio.dsound, nullptr);
     if (FAILED(hr)) {
         debug_print("Error: Could not create DirectSound object (hr: 0x%08X)\n", (uint32)hr);
         return;
     }
     
     HWND hwnd = GetDesktopWindow();
-    hr = IDirectSound_SetCooperativeLevel(Win32Audio.dsound, hwnd, DSSCL_PRIORITY);
+    hr = IDirectSound_SetCooperativeLevel(win32_audio.dsound, hwnd, DSSCL_PRIORITY);
     if (FAILED(hr)) {
         debug_print("Error: Could not set DirectSound cooperative level (hr: 0x%08X)\n", (uint32)hr);
-        IDirectSound_Release(Win32Audio.dsound);
+        IDirectSound_Release(win32_audio.dsound);
         return;
     }
     
@@ -212,54 +212,54 @@ void audio_init(Game* game) {
     primary_desc.dwFlags = DSBCAPS_PRIMARYBUFFER;
     
     hr = IDirectSound_CreateSoundBuffer(
-        Win32Audio.dsound, 
+        win32_audio.dsound, 
         &primary_desc, 
-        &Win32Audio.primary_buffer, 
+        &win32_audio.primary_buffer, 
         nullptr
     );
     
     if (FAILED(hr)) {
         debug_print("Error: Could not create primary buffer (hr: 0x%08X)\n", (uint32)hr);
-        IDirectSound_Release(Win32Audio.dsound);
+        IDirectSound_Release(win32_audio.dsound);
         return;
     }
     
     WAVEFORMATEX wave_format = {};
     wave_format.wFormatTag = WAVE_FORMAT_PCM;
-    wave_format.nChannels = (WORD)game->audio_channels;
-    wave_format.nSamplesPerSec = (DWORD)game->audio_sample_rate;
+    wave_format.nChannels = (WORD)AUDIO_CHANNELS;
+    wave_format.nSamplesPerSec = (DWORD)AUDIO_SAMPLE_RATE;
     wave_format.wBitsPerSample = sizeof(int16) * 8;
-    wave_format.nBlockAlign = (WORD)(game->audio_channels * sizeof(int16));
+    wave_format.nBlockAlign = (WORD)(AUDIO_CHANNELS * sizeof(int16));
     wave_format.nAvgBytesPerSec = wave_format.nSamplesPerSec * wave_format.nBlockAlign;
     
-    hr = IDirectSoundBuffer_SetFormat(Win32Audio.primary_buffer, &wave_format);
+    hr = IDirectSoundBuffer_SetFormat(win32_audio.primary_buffer, &wave_format);
     if (FAILED(hr)) {
         debug_print("Error: Could not set primary buffer format (hr: 0x%08X)\n", (uint32)hr);
     }
 
     // Derived sizes for latency and buffer management
-    Win32Audio.block_align = wave_format.nBlockAlign;
-    Win32Audio.block_bytes = (uint32)((game->audio_sample_rate / game->fps) * wave_format.nBlockAlign);
-    Win32Audio.buffer_size = Win32Audio.block_bytes * NUM_BUFFERS;
-    Win32Audio.samples_per_buffer = Win32Audio.buffer_size / sizeof(int16);
+    win32_audio.block_align = wave_format.nBlockAlign;
+    win32_audio.block_bytes = (uint32)((AUDIO_SAMPLE_RATE / FPS) * wave_format.nBlockAlign);
+    win32_audio.buffer_size = win32_audio.block_bytes * NUM_BUFFERS;
+    win32_audio.samples_per_buffer = win32_audio.buffer_size / sizeof(int16);
     
     DSBUFFERDESC secondary_desc = {};
     secondary_desc.dwSize = sizeof(DSBUFFERDESC);
     secondary_desc.dwFlags = DSBCAPS_GETCURRENTPOSITION2 | DSBCAPS_GLOBALFOCUS;
-    secondary_desc.dwBufferBytes = Win32Audio.buffer_size;
+    secondary_desc.dwBufferBytes = win32_audio.buffer_size;
     secondary_desc.lpwfxFormat = &wave_format;
     
     hr = IDirectSound_CreateSoundBuffer(
-        Win32Audio.dsound,
+        win32_audio.dsound,
         &secondary_desc,
-        &Win32Audio.secondary_buffer,
+        &win32_audio.secondary_buffer,
         nullptr
     );
     
     if (FAILED(hr)) {
         debug_print("Error: Could not create secondary buffer (hr: 0x%08X)\n", (uint32)hr);
-        IDirectSoundBuffer_Release(Win32Audio.primary_buffer);
-        IDirectSound_Release(Win32Audio.dsound);
+        IDirectSoundBuffer_Release(win32_audio.primary_buffer);
+        IDirectSound_Release(win32_audio.dsound);
         return;
     }
     
@@ -267,8 +267,8 @@ void audio_init(Game* game) {
     DWORD audio_bytes1, audio_bytes2;
     
     hr = IDirectSoundBuffer_Lock(
-        Win32Audio.secondary_buffer,
-        0, Win32Audio.buffer_size,
+        win32_audio.secondary_buffer,
+        0, win32_audio.buffer_size,
         &audio_ptr1, &audio_bytes1,
         &audio_ptr2, &audio_bytes2,
         DSBLOCK_ENTIREBUFFER
@@ -281,23 +281,23 @@ void audio_init(Game* game) {
         }
         
         IDirectSoundBuffer_Unlock(
-            Win32Audio.secondary_buffer,
+            win32_audio.secondary_buffer,
             audio_ptr1, audio_bytes1,
             audio_ptr2, audio_bytes2
         );
     }
     
     hr = IDirectSoundBuffer_Play(
-        Win32Audio.secondary_buffer, 
+        win32_audio.secondary_buffer, 
         0, 0, 
         DSBPLAY_LOOPING
     );
     
     if (FAILED(hr)) {
         debug_print("Error: Could not start playing secondary buffer (hr: 0x%08X)\n", (uint32)hr);
-        IDirectSoundBuffer_Release(Win32Audio.secondary_buffer);
-        IDirectSoundBuffer_Release(Win32Audio.primary_buffer);
-        IDirectSound_Release(Win32Audio.dsound);
+        IDirectSoundBuffer_Release(win32_audio.secondary_buffer);
+        IDirectSoundBuffer_Release(win32_audio.primary_buffer);
+        IDirectSound_Release(win32_audio.dsound);
         return;
     }
 
@@ -305,45 +305,45 @@ void audio_init(Game* game) {
     {
         DWORD play_pos = 0, write_pos = 0;
         if (SUCCEEDED(IDirectSoundBuffer_GetCurrentPosition(
-                Win32Audio.secondary_buffer, &play_pos, &write_pos))) {
-            Win32Audio.running_write_pos = write_pos;
+                win32_audio.secondary_buffer, &play_pos, &write_pos))) {
+            win32_audio.running_write_pos = write_pos;
         } else {
-            Win32Audio.running_write_pos = 0;
+            win32_audio.running_write_pos = 0;
         }
-        Win32Audio.safety_bytes = Win32Audio.block_bytes; // ~1 frame (~16.7ms)
+        win32_audio.safety_bytes = win32_audio.block_bytes; // ~1 frame (~16.7ms)
     }
     
-    Win32Audio.audio_event = CreateEvent(nullptr, false, false, nullptr);
-    Win32Audio.should_stop = false;
+    win32_audio.audio_event = CreateEvent(nullptr, false, false, nullptr);
+    win32_audio.should_stop = false;
     
-    Win32Audio.audio_thread = CreateThread(
+    win32_audio.audio_thread = CreateThread(
         nullptr, 0, 
         audio_thread_proc, 
-        game, 
+        audio_state, 
         0, nullptr
     );
     
-    if (!Win32Audio.audio_thread) {
+    if (!win32_audio.audio_thread) {
         debug_print("Error: Could not create audio thread\n");
-        CloseHandle(Win32Audio.audio_event);
-        IDirectSoundBuffer_Release(Win32Audio.secondary_buffer);
-        IDirectSoundBuffer_Release(Win32Audio.primary_buffer);
-        IDirectSound_Release(Win32Audio.dsound);
+        CloseHandle(win32_audio.audio_event);
+        IDirectSoundBuffer_Release(win32_audio.secondary_buffer);
+        IDirectSoundBuffer_Release(win32_audio.primary_buffer);
+        IDirectSound_Release(win32_audio.dsound);
         return;
     }
     
-    Win32Audio.initialized = true;
+    win32_audio.initialized = true;
     debug_print("DirectSound audio system initialized successfully\n");
 }
 
-void audio_update_buffer(Game* game) {
-    if (!Win32Audio.initialized || !game->audio) {
+void platform_audio_update_buffer() {
+    if (!win32_audio.initialized || !win32_audio.audio_state) {
         return;
     }
     
     usize samples_written = ring_buffer_write(
-        &Win32Audio.ring_buffer,
-        game->audio,
+        &win32_audio.ring_buffer,
+        win32_audio.audio_state->audio,
         AUDIO_CAPACITY
     );
     
@@ -351,48 +351,48 @@ void audio_update_buffer(Game* game) {
         /* debug_print("Ring buffer is full, some audio data was dropped\n"); */
     }
     
-    SetEvent(Win32Audio.audio_event);
+    SetEvent(win32_audio.audio_event);
 }
 
-void audio_set_volume(real32 volume) {
+void platform_audio_set_volume(real32 volume) {
     if (volume < 0.0f) volume = 0.0f;
     if (volume > 1.0f) volume = 1.0f;
-    Win32Audio.game->audio_volume = volume;
+    win32_audio.audio_state->volume = volume;
 }
 
-void audio_cleanup(void) {
-    Win32Audio.should_stop = true;
+void platform_audio_cleanup(void) {
+    win32_audio.should_stop = true;
     
-    if (Win32Audio.audio_thread) {
-        SetEvent(Win32Audio.audio_event);
-        WaitForSingleObject(Win32Audio.audio_thread, 1000);
-        CloseHandle(Win32Audio.audio_thread);
-        Win32Audio.audio_thread = nullptr;
+    if (win32_audio.audio_thread) {
+        SetEvent(win32_audio.audio_event);
+        WaitForSingleObject(win32_audio.audio_thread, 1000);
+        CloseHandle(win32_audio.audio_thread);
+        win32_audio.audio_thread = nullptr;
     }
     
-    if (Win32Audio.audio_event) {
-        CloseHandle(Win32Audio.audio_event);
-        Win32Audio.audio_event = nullptr;
+    if (win32_audio.audio_event) {
+        CloseHandle(win32_audio.audio_event);
+        win32_audio.audio_event = nullptr;
     }
     
-    if (Win32Audio.secondary_buffer) {
-        IDirectSoundBuffer_Stop(Win32Audio.secondary_buffer);
-        IDirectSoundBuffer_Release(Win32Audio.secondary_buffer);
-        Win32Audio.secondary_buffer = nullptr;
+    if (win32_audio.secondary_buffer) {
+        IDirectSoundBuffer_Stop(win32_audio.secondary_buffer);
+        IDirectSoundBuffer_Release(win32_audio.secondary_buffer);
+        win32_audio.secondary_buffer = nullptr;
     }
     
-    if (Win32Audio.primary_buffer) {
-        IDirectSoundBuffer_Release(Win32Audio.primary_buffer);
-        Win32Audio.primary_buffer = nullptr;
+    if (win32_audio.primary_buffer) {
+        IDirectSoundBuffer_Release(win32_audio.primary_buffer);
+        win32_audio.primary_buffer = nullptr;
     }
     
-    if (Win32Audio.dsound) {
-        IDirectSound_Release(Win32Audio.dsound);
-        Win32Audio.dsound = nullptr;
+    if (win32_audio.dsound) {
+        IDirectSound_Release(win32_audio.dsound);
+        win32_audio.dsound = nullptr;
     }
     
-    ring_buffer_destroy(&Win32Audio.ring_buffer);
-    Win32Audio.initialized = false;
+    ring_buffer_destroy(&win32_audio.ring_buffer);
+    win32_audio.initialized = false;
     
     debug_print("DirectSound audio system cleaned up\n");
 }

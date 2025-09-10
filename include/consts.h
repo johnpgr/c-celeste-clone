@@ -1,0 +1,19 @@
+#pragma once
+
+#define TITLE "The game"
+#define FPS 60
+#define DELTA_TIME (1.0f/FPS)
+
+#define AUDIO_SAMPLE_RATE 48000
+#define AUDIO_CHANNELS 2
+#define AUDIO_CAPACITY ((AUDIO_SAMPLE_RATE / FPS) * AUDIO_CHANNELS)
+
+#define MAX_AUDIO_SOURCES 16
+#define STREAM_BUFFER_FRAMES 4096
+
+#define WORLD_WIDTH 320
+#define WORLD_HEIGHT 180
+#define SCALE 4
+#define TILESIZE 8
+
+#define MAX_TRANSFORMS 1000

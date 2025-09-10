@@ -1,6 +1,7 @@
 #pragma once
 
 #include "def.h"
+#include "renderer.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -12,6 +13,7 @@
 #endif
 
 #define NANOS_PER_SEC (1000*1000*1000)
+#define NANOS_PER_MILLI (1000*1000)
 
 static inline uint64 current_time_nanos(void) {
 #ifdef _WIN32
@@ -43,4 +45,24 @@ static inline void sleep_nanos(uint64 nanos) {
     ts.tv_nsec = nanos % 1000000000;
     nanosleep(&ts, nullptr);
 #endif
+}
+
+static inline IVec2 screen_to_world(InputState* input_state, RendererState* renderer_state, IVec2 screen_pos) {
+    OrthographicCamera2D camera = renderer_state->game_camera;
+
+    int x = (real32)screen_pos.x / 
+                (real32)input_state->screen_size.x * 
+                camera.dimensions.x; // [0; dimensions.x]
+
+    // Offset using dimensions and position
+    x += -camera.dimensions.x / 2.0f + camera.position.x;
+
+    int y = (real32)screen_pos.y / 
+                (real32)input_state->screen_size.y * 
+                camera.dimensions.y; // [0; dimensions.y]
+
+    // Offset using dimensions and position
+    y += camera.dimensions.y / 2.0f + camera.position.y;
+
+    return ivec2(x, y);
 }

@@ -1,30 +1,6 @@
 #pragma once
-#include "game.h"
-
-/**
- * @brief Key codes for input handling
- * These are abstract key identifiers, not platform-specific codes
- */
-typedef enum {
-    WINDOW_KEY_ESCAPE,
-    WINDOW_KEY_SPACE,
-    WINDOW_KEY_A,
-    WINDOW_KEY_D,
-    WINDOW_KEY_S,
-    WINDOW_KEY_W,
-    WINDOW_KEY_F,
-    WINDOW_KEY_M,
-    WINDOW_KEY_COUNT  // Keep track of total keys
-} WindowKey;
-
-/**
- * @brief Mouse button codes
- */
-typedef enum {
-    WINDOW_MOUSE_LEFT = 0,
-    WINDOW_MOUSE_RIGHT = 1,
-    WINDOW_MOUSE_MIDDLE = 2
-} WindowMouseButton;
+#include "input.h"
+#include "renderer.h"
 
 /**
  * @brief Initialize the window system with a game instance
@@ -32,7 +8,7 @@ typedef enum {
  * 
  * Creates the application delegate and sets up the Cocoa application.
  */
-void window_init(Game* game, int32 width, int32 height);
+void window_init(InputState* input_state, RendererState* renderer_state);
 
 /**
  * @brief Clean up window resources
@@ -55,27 +31,6 @@ bool window_should_close(void);
  * keyboard input, mouse input, and window events.
  */
 void window_poll_events(void);
-
-/**
- * @brief Get the state of a keyboard key
- * @param key The key code to check
- * @return true if the key is currently pressed, false otherwise
- */
-bool window_get_key_state(WindowKey key);
-
-/**
- * @brief Get the current mouse position
- * @param x Pointer to store the X coordinate (can be nullptr)
- * @param y Pointer to store the Y coordinate (can be nullptr)
- */
-void window_get_mouse_position(int* x, int* y);
-
-/**
- * @brief Get the state of a mouse button
- * @param button The mouse button to check
- * @return true if the button is currently pressed, false otherwise
- */
-bool window_get_mouse_button_state(int button);
 
 /**
  * @brief Set the window title
@@ -102,11 +57,6 @@ void window_set_size(int width, int height);
  * @param resizable true to make the window resizable, false otherwise
  */
 void window_set_resizable(bool resizable);
-
-/**
- * @brief Set wheter the window has vsync
- */
-void window_set_vsync(bool enable);
 
 /**
  * @brief Present the framebuffer to the screen

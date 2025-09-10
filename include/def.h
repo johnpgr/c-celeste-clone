@@ -35,8 +35,15 @@
 #define TB(number) (GB(number) * 1024ull)
 #define ARRAY_LEN(arr) (sizeof(arr) / sizeof((arr)[0]))
 #define CLAMP(val, lo, hi) ((val) < (lo) ? (lo) : ((val) > (hi) ? (hi) : (val)))
-
 #define RGBA(r, g, b, a) (r / 255.0f), (g / 255.0f), (b / 255.0f), (a / 255.0f)
+
+#ifdef _WIN32
+#define export __declspec(dllexport)
+#elif __linux__
+#define export
+#elif __APPLE__
+#define export
+#endif
 
 void debug_print(const char* format, ...);
 
@@ -108,6 +115,7 @@ Vec2 vec2_div(Vec2 vec, real32 scalar);
 Vec2 vec2iv2(IVec2 vec);
 
 IVec2 ivec2(int32 x, int32 y);
+IVec2 ivec2_minus(IVec2 vec, IVec2 other);
 
 Vec3 vec3(real32 x, real32 y, real32 z);
 

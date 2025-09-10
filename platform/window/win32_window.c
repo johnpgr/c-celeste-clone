@@ -1,43 +1,21 @@
 #include <windows.h>
 #include <windowsx.h>
+#include "def.h"
 #include "game.h"
 #include "window.h"
+#include "input.h"
+#include "utils.h"
 #include "glad/glad.h"
 
-typedef BOOL (WINAPI * PFNWGLSWAPINTERVALEXTPROC) (int interval);
-
 static struct {
+    InputState* input_state;
+    RendererState* renderer_state;
     HWND hwnd;
     HDC hdc;
     HGLRC hglrc;
-    int32 client_width;
-    int32 client_height;
-    Game* game;
     bool should_close;
     bool is_resizable;
-    PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT;
-} WIN32Window;
-
-/**
- * @brief Input state tracking structure
- */
-static struct {
-    bool keys[WINDOW_KEY_COUNT];
-    bool mouse_buttons[3];
-    int32 mouse_x, mouse_y;
-} WIN32Input;
-
-internal void init_vsync_extension() {
-    WIN32Window.wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC)wglGetProcAddress("wglSwapIntervalEXT");
-    
-    if (WIN32Window.wglSwapIntervalEXT) {
-        debug_print("  WGL_EXT_swap_control extension loaded\n");
-        WIN32Window.wglSwapIntervalEXT(0);
-        debug_print("  VSync disabled\n");
-    } else {
-        debug_print("  Warning: WGL_EXT_swap_control extension not available\n");
-    }
-}
+} win32_window;
 
 internal bool init_opengl_context() {
     debug_print("  Initializing OpenGL context.\n");
@@ -63,35 +41,35 @@ internal bool init_opengl_context() {
         0, 0, 0                // layer masks ignored
     };
 
-    int32 pixel_format = ChoosePixelFormat(WIN32Window.hdc, &pfd);
+    int32 pixel_format = ChoosePixelFormat(win32_window.hdc, &pfd);
     if (!pixel_format) {
         debug_print("Error: Failed to choose pixel format\n");
         return false;
     }
 
-    if (!SetPixelFormat(WIN32Window.hdc, pixel_format, &pfd)) {
+    if (!SetPixelFormat(win32_window.hdc, pixel_format, &pfd)) {
         debug_print("Error: Failed to set pixel format\n");
         return false;
     }
 
-    WIN32Window.hglrc = wglCreateContext(WIN32Window.hdc);
-    if (!WIN32Window.hglrc) {
+    win32_window.hglrc = wglCreateContext(win32_window.hdc);
+    if (!win32_window.hglrc) {
         debug_print("Error: Failed to create OpenGL context\n");
         return false;
     }
 
-    if (!wglMakeCurrent(WIN32Window.hdc, WIN32Window.hglrc)) {
+    if (!wglMakeCurrent(win32_window.hdc, win32_window.hglrc)) {
         debug_print("Error: Failed to make OpenGL context current\n");
-        wglDeleteContext(WIN32Window.hglrc);
-        WIN32Window.hglrc = nullptr;
+        wglDeleteContext(win32_window.hglrc);
+        win32_window.hglrc = nullptr;
         return false;
     }
 
     if (!gladLoadGL()) {
         debug_print("Error: Failed to load OpenGL functions\n");
         wglMakeCurrent(nullptr, nullptr);
-        wglDeleteContext(WIN32Window.hglrc);
-        WIN32Window.hglrc = nullptr;
+        wglDeleteContext(win32_window.hglrc);
+        win32_window.hglrc = nullptr;
         return false;
     }
 
@@ -102,38 +80,116 @@ internal bool init_opengl_context() {
     return true;
 }
 
-/**
- * @brief Map Win32 virtual key codes to our key constants
- */
-internal void update_key_state(WPARAM wParam, bool is_pressed) {
-    switch (wParam) {
-        case VK_ESCAPE:
-            WIN32Input.keys[WINDOW_KEY_ESCAPE] = is_pressed;
-            break;
-        case VK_SPACE:
-            WIN32Input.keys[WINDOW_KEY_SPACE] = is_pressed;
-            break;
-        case 'A':
-            WIN32Input.keys[WINDOW_KEY_A] = is_pressed;
-            break;
-        case 'D':
-            WIN32Input.keys[WINDOW_KEY_D] = is_pressed;
-            break;
-        case 'S':
-            WIN32Input.keys[WINDOW_KEY_S] = is_pressed;
-            break;
-        case 'W':
-            WIN32Input.keys[WINDOW_KEY_W] = is_pressed;
-            break;
-        case 'F':
-            WIN32Input.keys[WINDOW_KEY_F] = is_pressed;
-            break;
-        case 'M':
-            WIN32Input.keys[WINDOW_KEY_M] = is_pressed;
-            break;
-        default:
-            break;
-    }
+internal void win32_fill_input_lookup_table() {
+    keycode_lookup_table[VK_LBUTTON] = KEY_MOUSE_LEFT;
+    keycode_lookup_table[VK_MBUTTON] = KEY_MOUSE_MIDDLE;
+    keycode_lookup_table[VK_RBUTTON] = KEY_MOUSE_RIGHT;
+
+    keycode_lookup_table['A'] = KEY_A;
+    keycode_lookup_table['B'] = KEY_B;
+    keycode_lookup_table['C'] = KEY_C;
+    keycode_lookup_table['D'] = KEY_D;
+    keycode_lookup_table['E'] = KEY_E;
+    keycode_lookup_table['F'] = KEY_F;
+    keycode_lookup_table['G'] = KEY_G;
+    keycode_lookup_table['H'] = KEY_H;
+    keycode_lookup_table['I'] = KEY_I;
+    keycode_lookup_table['J'] = KEY_J;
+    keycode_lookup_table['K'] = KEY_K;
+    keycode_lookup_table['L'] = KEY_L;
+    keycode_lookup_table['M'] = KEY_M;
+    keycode_lookup_table['N'] = KEY_N;
+    keycode_lookup_table['O'] = KEY_O;
+    keycode_lookup_table['P'] = KEY_P;
+    keycode_lookup_table['Q'] = KEY_Q;
+    keycode_lookup_table['R'] = KEY_R;
+    keycode_lookup_table['S'] = KEY_S;
+    keycode_lookup_table['T'] = KEY_T;
+    keycode_lookup_table['U'] = KEY_U;
+    keycode_lookup_table['V'] = KEY_V;
+    keycode_lookup_table['W'] = KEY_W;
+    keycode_lookup_table['X'] = KEY_X;
+    keycode_lookup_table['Y'] = KEY_Y;
+    keycode_lookup_table['Z'] = KEY_Z;
+    keycode_lookup_table['0'] = KEY_0;
+    keycode_lookup_table['1'] = KEY_1;
+    keycode_lookup_table['2'] = KEY_2;
+    keycode_lookup_table['3'] = KEY_3;
+    keycode_lookup_table['4'] = KEY_4;
+    keycode_lookup_table['5'] = KEY_5;
+    keycode_lookup_table['6'] = KEY_6;
+    keycode_lookup_table['7'] = KEY_7;
+    keycode_lookup_table['8'] = KEY_8;
+    keycode_lookup_table['9'] = KEY_9;
+
+    keycode_lookup_table[VK_SPACE] = KEY_SPACE,
+    keycode_lookup_table[VK_OEM_3] = KEY_TICK,
+    keycode_lookup_table[VK_OEM_MINUS] = KEY_MINUS,
+
+    keycode_lookup_table[VK_OEM_PLUS] = KEY_EQUAL,
+    keycode_lookup_table[VK_OEM_4] = KEY_LEFT_BRACKET,
+    keycode_lookup_table[VK_OEM_6] = KEY_RIGHT_BRACKET,
+    keycode_lookup_table[VK_OEM_1] = KEY_SEMICOLON,
+    keycode_lookup_table[VK_OEM_7] = KEY_QUOTE,
+    keycode_lookup_table[VK_OEM_COMMA] = KEY_COMMA,
+    keycode_lookup_table[VK_OEM_PERIOD] = KEY_PERIOD,
+    keycode_lookup_table[VK_OEM_2] = KEY_FORWARD_SLASH,
+    keycode_lookup_table[VK_OEM_5] = KEY_BACKWARD_SLASH,
+    keycode_lookup_table[VK_TAB] = KEY_TAB,
+    keycode_lookup_table[VK_ESCAPE] = KEY_ESCAPE,
+    keycode_lookup_table[VK_PAUSE] = KEY_PAUSE,
+    keycode_lookup_table[VK_UP] = KEY_UP,
+    keycode_lookup_table[VK_DOWN] = KEY_DOWN,
+    keycode_lookup_table[VK_LEFT] = KEY_LEFT,
+    keycode_lookup_table[VK_RIGHT] = KEY_RIGHT,
+    keycode_lookup_table[VK_BACK] = KEY_BACKSPACE,
+    keycode_lookup_table[VK_RETURN] = KEY_RETURN,
+    keycode_lookup_table[VK_DELETE] = KEY_DELETE,
+    keycode_lookup_table[VK_INSERT] = KEY_INSERT,
+    keycode_lookup_table[VK_HOME] = KEY_HOME,
+    keycode_lookup_table[VK_END] = KEY_END,
+    keycode_lookup_table[VK_PRIOR] = KEY_PAGE_UP,
+    keycode_lookup_table[VK_NEXT] = KEY_PAGE_DOWN,
+    keycode_lookup_table[VK_CAPITAL] = KEY_CAPS_LOCK,
+    keycode_lookup_table[VK_NUMLOCK] = KEY_NUM_LOCK,
+    keycode_lookup_table[VK_SCROLL] = KEY_SCROLL_LOCK,
+    keycode_lookup_table[VK_APPS] = KEY_MENU,
+
+    keycode_lookup_table[VK_SHIFT] = KEY_SHIFT,
+    keycode_lookup_table[VK_LSHIFT] = KEY_SHIFT,
+    keycode_lookup_table[VK_RSHIFT] = KEY_SHIFT,
+
+    keycode_lookup_table[VK_CONTROL] = KEY_CONTROL,
+    keycode_lookup_table[VK_LCONTROL] = KEY_CONTROL,
+    keycode_lookup_table[VK_RCONTROL] = KEY_CONTROL,
+
+    keycode_lookup_table[VK_MENU] = KEY_ALT,
+    keycode_lookup_table[VK_LMENU] = KEY_ALT,
+    keycode_lookup_table[VK_RMENU] = KEY_ALT,
+
+    keycode_lookup_table[VK_F1] = KEY_F1;
+    keycode_lookup_table[VK_F2] = KEY_F2;
+    keycode_lookup_table[VK_F3] = KEY_F3;
+    keycode_lookup_table[VK_F4] = KEY_F4;
+    keycode_lookup_table[VK_F5] = KEY_F5;
+    keycode_lookup_table[VK_F6] = KEY_F6;
+    keycode_lookup_table[VK_F7] = KEY_F7;
+    keycode_lookup_table[VK_F8] = KEY_F8;
+    keycode_lookup_table[VK_F9] = KEY_F9;
+    keycode_lookup_table[VK_F10] = KEY_F10;
+    keycode_lookup_table[VK_F11] = KEY_F11;
+    keycode_lookup_table[VK_F12] = KEY_F12;
+
+    keycode_lookup_table[VK_NUMPAD0] = KEY_NUMPAD_0;
+    keycode_lookup_table[VK_NUMPAD1] = KEY_NUMPAD_1;
+    keycode_lookup_table[VK_NUMPAD2] = KEY_NUMPAD_2;
+    keycode_lookup_table[VK_NUMPAD3] = KEY_NUMPAD_3;
+    keycode_lookup_table[VK_NUMPAD4] = KEY_NUMPAD_4;
+    keycode_lookup_table[VK_NUMPAD5] = KEY_NUMPAD_5;
+    keycode_lookup_table[VK_NUMPAD6] = KEY_NUMPAD_6;
+    keycode_lookup_table[VK_NUMPAD7] = KEY_NUMPAD_7;
+    keycode_lookup_table[VK_NUMPAD8] = KEY_NUMPAD_8;
+    keycode_lookup_table[VK_NUMPAD9] = KEY_NUMPAD_9;
 }
 
 /**
@@ -142,7 +198,7 @@ internal void update_key_state(WPARAM wParam, bool is_pressed) {
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
         case WM_CLOSE:
-            WIN32Window.should_close = true;
+            win32_window.should_close = true;
             DestroyWindow(hWnd);
             break;
         case WM_DESTROY:
@@ -150,42 +206,37 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             break;
         case WM_KEYDOWN:
         case WM_SYSKEYDOWN:
-            update_key_state(wParam, true);
-            break;
         case WM_KEYUP:
-        case WM_SYSKEYUP:
-            update_key_state(wParam, false);
-            break;
+        case WM_SYSKEYUP: {
+            bool is_down = (uMsg == WM_KEYDOWN) || (uMsg == WM_SYSKEYDOWN) || (uMsg == WM_LBUTTONDOWN);
+            KeyCode keycode = keycode_lookup_table[wParam];
+            Key* key = &win32_window.input_state->keys[keycode];
+            key->just_pressed = !key->just_pressed && !key->is_down && is_down;
+            key->just_released = !key->just_released && key->is_down && !is_down;
+            key->is_down = is_down;
+            key->half_transition_count++;
+        } break;
         case WM_LBUTTONDOWN:
-            WIN32Input.mouse_buttons[WINDOW_MOUSE_LEFT] = true;
-            break;
         case WM_LBUTTONUP:
-            WIN32Input.mouse_buttons[WINDOW_MOUSE_LEFT] = false;
-            break;
         case WM_RBUTTONDOWN:
-            WIN32Input.mouse_buttons[WINDOW_MOUSE_RIGHT] = true;
-            break;
         case WM_RBUTTONUP:
-            WIN32Input.mouse_buttons[WINDOW_MOUSE_RIGHT] = false;
-            break;
         case WM_MBUTTONDOWN:
-            WIN32Input.mouse_buttons[WINDOW_MOUSE_MIDDLE] = true;
-            break;
-        case WM_MBUTTONUP:
-            WIN32Input.mouse_buttons[WINDOW_MOUSE_MIDDLE] = false;
-            break;
-        case WM_MOUSEMOVE:
-            WIN32Input.mouse_x = GET_X_LPARAM(lParam);
-            WIN32Input.mouse_y = GET_Y_LPARAM(lParam);
-            break;
+        case WM_MBUTTONUP: {
+            bool is_down = (uMsg == WM_LBUTTONDOWN || uMsg == WM_RBUTTONDOWN || uMsg == WM_MBUTTONDOWN);
+            int mousecode =
+                (uMsg == WM_LBUTTONDOWN || uMsg == WM_LBUTTONUP) ? VK_LBUTTON :
+                (uMsg == WM_MBUTTONDOWN || uMsg == WM_MBUTTONUP) ? VK_MBUTTON : VK_RBUTTON;
+
+            KeyCode keycode = keycode_lookup_table[mousecode];
+            Key* key = &win32_window.input_state->keys[keycode];
+            key->just_pressed = !key->just_pressed && !key->is_down && is_down;
+            key->just_released = !key->just_released && key->is_down && !is_down;
+            key->is_down = is_down;
+            key->half_transition_count++;
+        } break;
         case WM_SIZE:
-            WIN32Window.client_width = LOWORD(lParam);
-            WIN32Window.client_height = HIWORD(lParam);
-            
-            if (WIN32Window.game) {
-                WIN32Window.game->window_width = WIN32Window.client_width;
-                WIN32Window.game->window_height = WIN32Window.client_height;
-            }
+            win32_window.input_state->screen_size.x = LOWORD(lParam);
+            win32_window.input_state->screen_size.y = HIWORD(lParam);
 
             break;
         default:
@@ -198,11 +249,12 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 /**
  * @brief Initialize the window system with a game instance
  */
-void window_init(Game* game, int32 width, int32 height) {
+void window_init(InputState* input_state, RendererState* renderer_state) {
+    win32_window.input_state = input_state;
+    win32_window.renderer_state = renderer_state;
+
     debug_print("Initializing window system...\n");
-    debug_print("  Title: %s\n", game->title);
-    
-    WIN32Window.game = game;
+    debug_print("  Title: %s\n", TITLE);
 
     // Get the current instance handle
     HINSTANCE hInstance = GetModuleHandle(nullptr);
@@ -224,15 +276,15 @@ void window_init(Game* game, int32 width, int32 height) {
 
     // Create the window
     DWORD dwStyle = WS_OVERLAPPEDWINDOW ^ WS_THICKFRAME ^ WS_MAXIMIZEBOX;
-    RECT rect = { 0, 0, width, height };
-    AdjustWindowRect(&rect, dwStyle, FALSE);
+    RECT rect = { 0, 0, WORLD_WIDTH * SCALE, WORLD_HEIGHT * SCALE };
+    AdjustWindowRect(&rect, dwStyle, false);
     
     debug_print("  Adjusted window size: %dx%d\n", rect.right - rect.left, rect.bottom - rect.top);
 
-    WIN32Window.hwnd = CreateWindowEx(
+    win32_window.hwnd = CreateWindowEx(
         0,
         "GameWindowClass",
-        WIN32Window.game->title,
+        TITLE,
         dwStyle,
         CW_USEDEFAULT, CW_USEDEFAULT,
         rect.right - rect.left,
@@ -243,14 +295,14 @@ void window_init(Game* game, int32 width, int32 height) {
         nullptr
     );
 
-    if (!WIN32Window.hwnd) {
+    if (!win32_window.hwnd) {
         debug_print("Error: Failed to create window\n");
         return;
     }
     debug_print("  Window created successfully\n");
 
     // Get a device context for the window
-    WIN32Window.hdc = GetDC(WIN32Window.hwnd);
+    win32_window.hdc = GetDC(win32_window.hwnd);
     debug_print("  Device context obtained\n");
 
     if (!init_opengl_context()) {
@@ -258,10 +310,7 @@ void window_init(Game* game, int32 width, int32 height) {
         return;
     }
 
-    init_vsync_extension();
-
-    // ShowWindow(WIN32Window.hwnd, SW_SHOWDEFAULT);
-    UpdateWindow(WIN32Window.hwnd);
+    UpdateWindow(win32_window.hwnd);
     
     debug_print("Window system initialized successfully\n");
 }
@@ -270,21 +319,19 @@ void window_init(Game* game, int32 width, int32 height) {
  * @brief Present the framebuffer to the screen
  */
 void window_present(void) {
-    if (!WIN32Window.hwnd || !WIN32Window.hdc) return;
-
-    SwapBuffers(WIN32Window.hdc);
+    SwapBuffers(win32_window.hdc);
 }
 
 /**
  * @brief Show the window
  */
 void window_show(void) {
-    if (!WIN32Window.hwnd) return;
+    if (!win32_window.hwnd) return;
     
-    ShowWindow(WIN32Window.hwnd, SW_SHOWDEFAULT);
-    UpdateWindow(WIN32Window.hwnd);
-    SetForegroundWindow(WIN32Window.hwnd);
-    SetFocus(WIN32Window.hwnd);
+    ShowWindow(win32_window.hwnd, SW_SHOWDEFAULT);
+    UpdateWindow(win32_window.hwnd);
+    SetForegroundWindow(win32_window.hwnd);
+    SetFocus(win32_window.hwnd);
 }
 
 /**
@@ -293,21 +340,21 @@ void window_show(void) {
 void window_cleanup(void) {
     debug_print("Cleaning up window system...\n");
 
-    if (WIN32Window.hglrc) {
+    if (win32_window.hglrc) {
         wglMakeCurrent(nullptr, nullptr);
-        wglDeleteContext(WIN32Window.hglrc);
-        WIN32Window.hglrc = nullptr;
+        wglDeleteContext(win32_window.hglrc);
+        win32_window.hglrc = nullptr;
         debug_print("  OpenGL context deleted\n");
     }
 
-    if (WIN32Window.hdc) {
-        ReleaseDC(WIN32Window.hwnd, WIN32Window.hdc);
-        WIN32Window.hdc = nullptr;
+    if (win32_window.hdc) {
+        ReleaseDC(win32_window.hwnd, win32_window.hdc);
+        win32_window.hdc = nullptr;
         debug_print("  Device context released\n");
     }
-    if (WIN32Window.hwnd) {
-        DestroyWindow(WIN32Window.hwnd);
-        WIN32Window.hwnd = nullptr;
+    if (win32_window.hwnd) {
+        DestroyWindow(win32_window.hwnd);
+        win32_window.hwnd = nullptr;
         debug_print("  Window destroyed\n");
     }
     debug_print("Window system cleaned up\n");
@@ -317,54 +364,51 @@ void window_cleanup(void) {
  * @brief Check if the window should close
  */
 bool window_should_close(void) {
-    return WIN32Window.should_close;
+    return win32_window.should_close;
 }
 
 /**
  * @brief Process pending window events
  */
 void window_poll_events(void) {
+    for (int keycode = 0; keycode < KEY_COUNT; keycode++) {
+        win32_window.input_state->keys[keycode].just_pressed = false;
+        win32_window.input_state->keys[keycode].just_released = false;
+        win32_window.input_state->keys[keycode].half_transition_count = 0;
+    }
+
     MSG msg;
     while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
-}
 
-/**
- * @brief Get the state of a keyboard key
- */
-bool window_get_key_state(WindowKey key) {
-    if (key >= 0 && key < WINDOW_KEY_COUNT) {
-        return WIN32Input.keys[key];
-    }
-    return false;
-}
+    // Update mouse position
+    POINT cursor_pos = {};
+    GetCursorPos(&cursor_pos);
+    ScreenToClient(win32_window.hwnd, &cursor_pos);
 
-/**
- * @brief Get the current mouse position
- */
-void window_get_mouse_position(int* x, int* y) {
-    if (x) *x = WIN32Input.mouse_x;
-    if (y) *y = WIN32Input.mouse_y;
-}
+    win32_window.input_state->mouse_pos_prev = win32_window.input_state->mouse_pos;
+    win32_window.input_state->mouse_pos.x = cursor_pos.x;
+    win32_window.input_state->mouse_pos.y = cursor_pos.y;
+    win32_window.input_state->mouse_delta = ivec2_minus(
+        win32_window.input_state->mouse_pos,
+        win32_window.input_state->mouse_pos_prev
+    );
 
-/**
- * @brief Get the state of a mouse button
- */
-bool window_get_mouse_button_state(int button) {
-    if (button >= 0 && button < 3) {
-        return WIN32Input.mouse_buttons[button];
-    }
-    return false;
+    win32_window.input_state->mouse_pos_world = screen_to_world(
+        win32_window.input_state,
+        win32_window.renderer_state,
+        win32_window.input_state->mouse_pos
+    );
 }
 
 /**
  * @brief Set the window title
  */
 void window_set_title(const char* title) {
-    if (WIN32Window.hwnd && title) {
-        SetWindowText(WIN32Window.hwnd, title);
+    if (win32_window.hwnd && title) {
+        SetWindowText(win32_window.hwnd, title);
     }
 }
 
@@ -372,14 +416,14 @@ void window_set_title(const char* title) {
  * @brief Get the current window size
  */
 void window_get_size(int* width, int* height) {
-    if (!WIN32Window.hwnd) {
+    if (!win32_window.hwnd) {
         if (width) *width = 0;
         if (height) *height = 0;
         return;
     }
 
     RECT client_rect;
-    GetClientRect(WIN32Window.hwnd, &client_rect);
+    GetClientRect(win32_window.hwnd, &client_rect);
     if (width) *width = client_rect.right - client_rect.left;
     if (height) *height = client_rect.bottom - client_rect.top;
 }
@@ -388,23 +432,30 @@ void window_get_size(int* width, int* height) {
  * @brief Set the window size
  */
 void window_set_size(int width, int height) {
-    if (!WIN32Window.hwnd) return;
+    if (!win32_window.hwnd) return;
 
     RECT rect = { 0, 0, width, height };
-    DWORD dwStyle = GetWindowLong(WIN32Window.hwnd, GWL_STYLE);
-    AdjustWindowRect(&rect, dwStyle, FALSE);
+    DWORD dwStyle = GetWindowLong(win32_window.hwnd, GWL_STYLE);
+    AdjustWindowRect(&rect, dwStyle, false);
 
-    SetWindowPos(WIN32Window.hwnd, nullptr, 0, 0, rect.right - rect.left, rect.bottom - rect.top, SWP_NOMOVE | SWP_NOZORDER);
+    SetWindowPos(
+        win32_window.hwnd,
+        nullptr,
+        0, 0,
+        rect.right - rect.left,
+        rect.bottom - rect.top,
+        SWP_NOMOVE | SWP_NOZORDER
+    );
 }
 
 /**
  * @brief Set whether the window is resizable
  */
 void window_set_resizable(bool resizable) {
-    if (!WIN32Window.hwnd) return;
-    WIN32Window.is_resizable = resizable;
+    if (!win32_window.hwnd) return;
+    win32_window.is_resizable = resizable;
     
-    DWORD dwStyle = GetWindowLong(WIN32Window.hwnd, GWL_STYLE);
+    DWORD dwStyle = GetWindowLong(win32_window.hwnd, GWL_STYLE);
     if (resizable) {
         dwStyle |= WS_THICKFRAME;
         dwStyle |= WS_MAXIMIZEBOX;
@@ -413,15 +464,5 @@ void window_set_resizable(bool resizable) {
         dwStyle &= ~WS_MAXIMIZEBOX;
     }
     
-    SetWindowLong(WIN32Window.hwnd, GWL_STYLE, dwStyle);
-}
-
-/**
-* @brief Set wheter the window has vsync
-*/
-void window_set_vsync(bool enable) {
-    if (WIN32Window.wglSwapIntervalEXT) {
-        WIN32Window.wglSwapIntervalEXT(enable ? 1 : 0);
-        debug_print("VSync %s\n", enable ? "enabled" : "disabled");
-    }
+    SetWindowLong(win32_window.hwnd, GWL_STYLE, dwStyle);
 }

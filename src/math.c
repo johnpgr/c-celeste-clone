@@ -26,6 +26,10 @@ IVec2 ivec2(int32 x, int32 y) {
     };
 }
 
+IVec2 ivec2_minus(IVec2 vec, IVec2 other) {
+    return ivec2(vec.x - other.x, vec.y - other.y);
+}
+
 Vec3 vec3(real32 x, real32 y, real32 z) {
     return (Vec3) {
         .x = x,

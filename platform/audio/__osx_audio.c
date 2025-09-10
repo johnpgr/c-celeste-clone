@@ -105,7 +105,7 @@ internal void audio_callback(void* user_data, AudioQueueRef aq, AudioQueueBuffer
     AudioQueueEnqueueBuffer(aq, buffer, 0, nullptr);
 }
 
-void audio_init(Game* game) {
+void platform_audio_init(Game* game) {
     memset(&global_audio_state, 0, sizeof(global_audio_state));
     global_audio_state.game = game;
     game->audio_volume = 1.0f;
@@ -162,7 +162,7 @@ void audio_init(Game* game) {
     debug_print("Audio system initialized successfully\n");
 }
 
-void audio_update_buffer(Game* game) {
+void platform_audio_update_buffer(Game* game) {
     if (!global_audio_state.initialized || !game->audio) {
         return;
     }
@@ -178,13 +178,13 @@ void audio_update_buffer(Game* game) {
     }
 }
 
-void audio_set_volume(real32 volume) {
+void platform_audio_set_volume(real32 volume) {
     if (volume < 0.0f) volume = 0.0f;
     if (volume > 1.0f) volume = 1.0f;
     global_audio_state.game->audio_volume = volume;
 }
 
-void audio_cleanup(void) {
+void platform_audio_cleanup(void) {
     if (global_audio_state.queue) {
         AudioQueueStop(global_audio_state.queue, true);
         AudioQueueDispose(global_audio_state.queue, true);

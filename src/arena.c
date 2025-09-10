@@ -1,23 +1,31 @@
 #include "arena.h"
 
-void* arena_alloc(Arena* arena, usize size) {
+// TODO: Use platform-specific allocation functions
+Arena create_arena(usize size) {
+    Arena arena = {
+        .memory = (uint8*)malloc(size),
+        .size = size,
+        .offset = 0,
+    };
+    return arena;
+}
+
+void arena_cleanup(Arena *arena) {
+    free(arena->memory);
+}
+
+void *arena_alloc(Arena *arena, usize size) {
     // Align to 8 bytes for better performance
     usize aligned_size = (size + 7) & ~7;
     
     if (arena->offset + aligned_size > arena->size) {
-        debug_print("Error: %s arena out of memory (requested: %.1f KB, available: %.1f KB)\n", 
-                   arena->name, aligned_size / 1024.0f, (arena->size - arena->offset) / 1024.0f);
+        debug_print("Error: Arena out of memory (requested: %.1f KB, available: %.1f KB)\n", 
+                   aligned_size / 1024.0f, (arena->size - arena->offset) / 1024.0f);
         return nullptr;
     }
     
     void* ptr = arena->memory + arena->offset;
     arena->offset += aligned_size;
-    
-#if DEBUG_MODE
-    debug_print("%s arena alloc: %.1f KB at offset %.1f KB (remaining: %.1f KB)\n", 
-               arena->name, aligned_size / 1024.0f, (arena->offset - aligned_size) / 1024.0f, 
-               (arena->size - arena->offset) / 1024.0f);
-#endif
     
     return ptr;
 }
