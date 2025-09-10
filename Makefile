@@ -145,16 +145,17 @@ $(TARGET): $(OBJ)
 	$(CC) $^ -o $@ $(LDFLAGS) $(LINK_DEBUG_FLAGS) $(LDLIBS)
 	@echo "Build complete: $@"
 
+ifeq ($(PLATFORM), win32)
+GAME_DLL_TIMESTAMP := $(BIN_DIR)/game_$(shell powershell -Command "[int]([datetime]::UtcNow - (Get-Date '1970-01-01 00:00:00Z')).TotalSeconds").dll
+
 # Game dynamic library compilation
 $(GAME_DLL): $(GAME_OBJ)
 	@mkdir -p $(dir $@)
 	@echo "Building game dynamic library..."
-ifeq ($(PLATFORM), win32)
-	$(CC) $(GAME_OBJ) -o $@ $(GAME_DLL_FLAGS) $(LINK_DEBUG_FLAGS) $(LDLIBS)
-else
-	$(CC) $(GAME_OBJ) -o $@ $(GAME_DLL_FLAGS) $(LDFLAGS) $(LINK_DEBUG_FLAGS) $(LDLIBS)
-endif
+	$(CC) $(GAME_OBJ) -o $(GAME_DLL_TIMESTAMP) $(GAME_DLL_FLAGS) $(LINK_DEBUG_FLAGS) $(LDLIBS)
+	@cp -f $(GAME_DLL_TIMESTAMP) $(GAME_DLL)
 	@echo "Game DLL complete: $@"
+endif
 
 # ==============================================================================
 # Compilation Rules

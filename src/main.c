@@ -36,7 +36,6 @@ static void reload_game_dll(Arena* transient_storage) {
     static uint64 game_dll_timestamp;
 
     uint64 current_dll_timestamp = file_get_timestamp("game.dll");
-    assert(current_dll_timestamp != 0 && "Failed to get timestamp of game.dll");
 
     if (current_dll_timestamp > game_dll_timestamp) {
         if (game_dll) {

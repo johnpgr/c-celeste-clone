@@ -42,18 +42,13 @@ static RendererState* create_renderer_state(Arena* arena) {
     return state;
 }
 
-bool renderer_init(InputState* input_state, RendererState* renderer_state);
-void renderer_set_vsync(bool enable);
-void renderer_cleanup(void);
-void renderer_render();
-
 static void draw_sprite(SpriteID sprite_id, Vec2 pos) {
     assert(renderer_state->transform_count + 1 <= MAX_TRANSFORMS
            && "Max transform count reached");
 
     Sprite sprite = get_sprite(sprite_id);
 
-    Vec2 sprite_size = vec2iv2(sprite.size);
+    Vec2 sprite_size = vec2_mult(vec2iv2(sprite.size), SCALE);
 
     Transform transform = {
         .atlas_offset = sprite.atlas_offset,
@@ -64,3 +59,9 @@ static void draw_sprite(SpriteID sprite_id, Vec2 pos) {
 
     renderer_state->transforms[renderer_state->transform_count++] = transform;
 }
+
+// Functions provided by the platform renderer
+bool renderer_init(InputState* input_state, RendererState* renderer_state);
+void renderer_set_vsync(bool enable);
+void renderer_cleanup(void);
+void renderer_render();

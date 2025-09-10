@@ -1,6 +1,7 @@
 #pragma once
 
 #include <assert.h>
+#include <math.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <stdarg.h>
@@ -157,8 +158,38 @@ Vec2 vec2_minus(Vec2 vec, Vec2 other) {
     return vec2(vec.x - other.x, vec.y - other.y);
 }
 
+Vec2 vec2_plus(Vec2 vec, Vec2 other) {
+    return vec2(vec.x + other.x, vec.y + other.y);
+}
+
+Vec2 vec2_mult(Vec2 vec, real32 scalar) {
+    return vec2(vec.x * scalar, vec.y * scalar);
+}
+
 Vec2 vec2_div(Vec2 vec, real32 scalar) {
     return vec2(vec.x / scalar, vec.y / scalar);
+}
+
+real32 vec2_dot(Vec2 vec, Vec2 other) {
+    return vec.x * other.x + vec.y * other.y;
+}
+
+real32 vec2_length_squared(Vec2 vec) {
+    return vec2_dot(vec, vec);
+}
+
+real32 vec2_length(Vec2 vec) {
+    return sqrtf(vec2_length_squared(vec));
+}
+
+Vec2 vec2_normalize(Vec2 vec) {
+    real32 len = vec2_length(vec);
+    if (len < EPSILON) return vec2(0, 0);
+    return vec2_div(vec, len);
+}
+
+Vec2 vec2_lerp(Vec2 a, Vec2 b, real32 t) {
+    return vec2_plus(vec2_mult(a, 1.0f - t), vec2_mult(b, t));
 }
 
 IVec2 ivec2(int32 x, int32 y) {
@@ -172,7 +203,21 @@ IVec2 ivec2_minus(IVec2 vec, IVec2 other) {
     return ivec2(vec.x - other.x, vec.y - other.y);
 }
 
-Vec3 vec3(real32 x, real32 y, real32 z) {
+IVec2 ivec2_plus(IVec2 vec, IVec2 other) {
+    return ivec2(vec.x + other.x, vec.y + other.y);
+}
+
+IVec2 ivec2_mult(IVec2 vec, int32 scalar) {
+    return ivec2(vec.x * scalar, vec.y * scalar);
+}
+
+IVec2 ivec2_div(IVec2 vec, int32 scalar) {
+    return ivec2(vec.x / scalar, vec.y / scalar);
+}
+
+int32 ivec2_dot(IVec2 vec, IVec2 other) {
+    return vec.x * other.x + vec.y * other.y;
+}Vec3 vec3(real32 x, real32 y, real32 z) {
     return (Vec3) {
         .x = x,
         .y = y,

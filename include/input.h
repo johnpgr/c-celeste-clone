@@ -96,6 +96,7 @@ typedef struct {
 } InputState;
 
 static InputState* input_state;
+
 static InputState* create_input_state(Arena* arena) {
     InputState* state = (InputState*)arena_alloc(arena, sizeof(InputState));
     memset(state, 0, sizeof(InputState));

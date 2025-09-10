@@ -54,6 +54,7 @@ typedef struct {
 } AudioState;
 
 static AudioState* audio_state;
+
 static AudioState* create_audio_state(Arena* arena) {
     AudioState* state = (AudioState*)arena_alloc(arena, sizeof(AudioState));
     memset(state, 0, sizeof(AudioState));
