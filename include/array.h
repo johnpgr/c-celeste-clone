@@ -7,12 +7,13 @@
     usize capacity; \
 }
 
-#define create_array(T, N) \
-    (ARRAY(T, N)){ \
-        .data = {0}, \
-        .count = 0, \
-        .capacity = N \
-    }
+#define ARRAY_INIT(N) { \
+    .data = {0}, \
+    .count = 0, \
+    .capacity = N \
+}
+
+#define create_array(N) ARRAY_INIT(N)
 
 #define array_get(arr, index) \
     ({ \

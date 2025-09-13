@@ -30,6 +30,7 @@
 #define PI 3.14159265358979323846
 #define EPSILON 1e-6
 
+#define BIT(n) (1ull << (n))
 #define KB(number) ((number) * 1024ull)
 #define MB(number) (KB(number) * 1024ull)
 #define GB(number) (MB(number) * 1024ull)

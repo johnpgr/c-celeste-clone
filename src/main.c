@@ -98,7 +98,7 @@ int main(int argc, [[maybe_unused]] char* argv[argc + 1]) {
     window_set_resizable(true);
     platform_audio_init();
     renderer_init();
-    renderer_set_vsync(false);
+    renderer_set_vsync(true);
 
     static uint8 background_ogg_source[] = {
         #embed "assets/sounds/Background.ogg"

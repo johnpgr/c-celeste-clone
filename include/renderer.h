@@ -30,16 +30,18 @@ static RendererState* renderer_state;
 
 static RendererState* create_renderer_state(Arena* arena) {
     RendererState* state = (RendererState*)arena_alloc(arena, sizeof(RendererState));
-    if (state) {
-        memset(state, 0, sizeof(RendererState));
-        state->transforms.capacity = 1000;
-        state->game_camera.zoom = 1.0f;
-        state->game_camera.dimensions = vec2(WORLD_WIDTH, WORLD_HEIGHT);
-        state->game_camera.position = vec2(160, -90);
+    *state = (RendererState) {
+        .transforms = create_array(1000),
 
-        state->ui_camera.zoom = 1.0f;
-        state->ui_camera = state->game_camera;
-    }
+        .game_camera.zoom = 1.0f,
+        .game_camera.dimensions = vec2(WORLD_WIDTH, WORLD_HEIGHT),
+        .game_camera.position = vec2(160, -90),
+
+        .ui_camera.zoom = 1.0f,
+        .ui_camera.dimensions = vec2(WORLD_WIDTH, WORLD_HEIGHT),
+        .ui_camera.position = vec2(160, -90),
+    };
+
     return state;
 }
 
@@ -75,6 +77,10 @@ static void draw_sprite(SpriteID sprite_id, Vec2 pos) {
     array_push(renderer_state->transforms, transform);
 }
 
+static void draw_quad_t(Transform transform) {
+    array_push(renderer_state->transforms, transform);
+}
+
 static void draw_quad(Vec2 pos, Vec2 size) {
     Transform transform = {
         .pos = vec2_minus(pos, vec2_div(size, 2.0f)),
@@ -83,7 +89,7 @@ static void draw_quad(Vec2 pos, Vec2 size) {
         .sprite_size = ivec2(1, 1),
     };
 
-    array_push(renderer_state->transforms, transform);
+    return draw_quad_t(transform);
 }
 
 // Functions provided by the platform renderer

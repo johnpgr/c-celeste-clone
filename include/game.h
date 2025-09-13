@@ -43,11 +43,27 @@ typedef struct {
     bool fps_cap;
     IVec2 player_position;
 
+    ARRAY(IVec2, 21) tile_coords;
     Tile world_grid[WORLD_GRID.x][WORLD_GRID.y];
     KeyMapping key_mappings[GAME_INPUT_COUNT];
 } GameState;
 
 static GameState* game_state;
+
+static void init_tile_coords(GameState* state) {
+    IVec2 tiles_position = ivec2(48, 0);
+    for (int y = 0; y < 5; y++) {
+        for (int x = 0; x < 4; x++) {
+            array_push(state->tile_coords,
+                       ivec2(tiles_position.x + x * TILESIZE,
+                             tiles_position.y + y * TILESIZE));
+        }
+    }
+
+    // Black inside tile
+    array_push(state->tile_coords,
+               ivec2(tiles_position.x, tiles_position.y + 5 * TILESIZE));
+}
 
 static void init_key_mappings(GameState* state) {
     array_push(state->key_mappings[MOVE_UP].keys, KEY_W);
@@ -65,14 +81,23 @@ static void init_key_mappings(GameState* state) {
 
 static GameState* create_game_state(Arena* arena) {
     GameState* state = (GameState*)arena_alloc(arena, sizeof(GameState));
-    memset(state, 0, sizeof(GameState));
+    *state = (GameState) {
+        .fps_cap = false,
+        .player_position = ivec2(0, 0),
+        .tile_coords = create_array(21),
+        .key_mappings = {
+            [MOVE_UP] = {.keys = create_array(3)},
+            [MOVE_LEFT] = {.keys = create_array(3)},
+            [MOVE_DOWN] = {.keys = create_array(3)},
+            [MOVE_RIGHT] = {.keys = create_array(3)},
+            [MOUSE1] = {.keys = create_array(3)},
+            [MOUSE2] = {.keys = create_array(3)},
+            [JUMP] = {.keys = create_array(3)},
+            [QUIT] = {.keys = create_array(3)},
+        },
+    };
 
-    state->fps_cap = true;
-    state->player_position = ivec2(0, 0);
-    for (int i = 0; i < GAME_INPUT_COUNT; i++) {
-        state->key_mappings[i].keys.capacity = 3;
-    }
-
+    init_tile_coords(state);
     init_key_mappings(state);
 
     return state;
