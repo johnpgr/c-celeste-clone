@@ -248,7 +248,6 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
  */
 void window_init(const char* title, int width, int height) {
     debug_print("Initializing window system...\n");
-    debug_print("  Title: %s\n", TITLE);
 
     // Get the current instance handle
     HINSTANCE hInstance = GetModuleHandle(nullptr);

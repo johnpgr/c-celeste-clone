@@ -13,10 +13,10 @@ typedef struct {
 } OrthographicCamera2D;
 
 typedef struct {
-    Vec2 pos;
-    Vec2 size;
     IVec2 atlas_offset;
     IVec2 sprite_size;
+    Vec2 pos;
+    Vec2 size;
 } Transform;
 
 typedef struct {

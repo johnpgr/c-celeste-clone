@@ -60,16 +60,16 @@ void game_update(
         game_state->should_quit = true;
     }
     if (is_down(MOVE_LEFT)) {
-        game_state->player_position.x -= 10;
+        game_state->player_position.x -= 1;
     }
     if (is_down(MOVE_RIGHT)) {
-        game_state->player_position.x += 10;
+        game_state->player_position.x += 1;
     }
     if (is_down(MOVE_UP)) {
-        game_state->player_position.y -= 10;
+        game_state->player_position.y -= 1;
     }
     if (is_down(MOVE_DOWN)) {
-        game_state->player_position.y += 10;
+        game_state->player_position.y += 1;
     }
     if (is_down(MOUSE1)) {
         IVec2 mouse_pos_world = input_state->mouse_pos_world;
