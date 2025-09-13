@@ -1,4 +1,5 @@
 #include "glad/glad.h"
+#include "input.h"
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #include "renderer.h"
@@ -275,8 +276,8 @@ bool renderer_init() {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, gl_context.SBO);
     glNamedBufferData(
         gl_context.SBO,
-        sizeof(Transform) * MAX_TRANSFORMS,
-        renderer_state->transforms,
+        sizeof(Transform) * renderer_state->transforms.capacity,
+        renderer_state->transforms.data,
         GL_DYNAMIC_DRAW
     );
 
@@ -319,18 +320,18 @@ void renderer_render() {
     glNamedBufferSubData(
         gl_context.SBO,
         0,
-        sizeof(Transform) * renderer_state->transform_count,
-        renderer_state->transforms
+        sizeof(Transform) * renderer_state->transforms.count,
+        renderer_state->transforms.data
     );
 
     glDrawArraysInstanced(
         GL_TRIANGLES,
         0,
         6,
-        renderer_state->transform_count
+        renderer_state->transforms.count
     );
 
-    renderer_state->transform_count = 0;
+    array_clear(renderer_state->transforms);
 }
 
 void renderer_set_vsync(bool enable) {

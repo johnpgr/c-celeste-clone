@@ -2,7 +2,9 @@
 #include "math3d.h"
 
 typedef enum {
+    SPRITE_WHITE,
     SPRITE_DICE,
+
     SPRITE_COUNT,
 } SpriteID;
 
@@ -15,10 +17,14 @@ Sprite get_sprite(SpriteID sprite_id) {
     Sprite sprite = {};
 
     switch (sprite_id) {
-        case SPRITE_DICE:
+        case SPRITE_WHITE: {
             sprite.atlas_offset = ivec2(0, 0);
+            sprite.size = ivec2(1, 1);
+        } break;
+        case SPRITE_DICE: {
+            sprite.atlas_offset = ivec2(16, 0);
             sprite.size = ivec2(16, 16);
-            break;
+        } break;
         case SPRITE_COUNT:
             assert(false && "SPRITE_COUNT should never be used as a value of get_sprite");
     }

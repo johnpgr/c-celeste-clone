@@ -246,7 +246,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 /**
  * @brief Initialize the window system with a game instance
  */
-void window_init() {
+void window_init(const char* title, int width, int height) {
     debug_print("Initializing window system...\n");
     debug_print("  Title: %s\n", TITLE);
 
@@ -257,7 +257,7 @@ void window_init() {
     WNDCLASS wc = {};
     wc.lpfnWndProc = WindowProc;
     wc.hInstance = hInstance;
-    wc.lpszClassName = "GameWindowClass";
+    wc.lpszClassName = title;
     wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
 
@@ -270,15 +270,15 @@ void window_init() {
 
     // Create the window
     DWORD dwStyle = WS_OVERLAPPEDWINDOW ^ WS_THICKFRAME ^ WS_MAXIMIZEBOX;
-    RECT rect = { 0, 0, WORLD_WIDTH * SCALE, WORLD_HEIGHT * SCALE };
+    RECT rect = { 0, 0, width, height };
     AdjustWindowRect(&rect, dwStyle, false);
     
     debug_print("  Adjusted window size: %dx%d\n", rect.right - rect.left, rect.bottom - rect.top);
 
     win32_window.hwnd = CreateWindowEx(
         0,
-        "GameWindowClass",
-        TITLE,
+        title,
+        title,
         dwStyle,
         CW_USEDEFAULT, CW_USEDEFAULT,
         rect.right - rect.left,
@@ -392,11 +392,7 @@ void window_poll_events(void) {
         input_state->mouse_pos_prev
     );
 
-    input_state->mouse_pos_world = screen_to_world(
-        input_state,
-        renderer_state,
-        input_state->mouse_pos
-    );
+    input_state->mouse_pos_world = screen_to_world(input_state->mouse_pos);
 }
 
 /**

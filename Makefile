@@ -45,7 +45,7 @@ else
 endif
 
 # ==============================================================================
-# Output Directories
+# Output Directories 
 # ==============================================================================
 
 BUILD_MODE_DIR := $(BUILD_DIR)/$(BUILD_MODE)
@@ -55,7 +55,7 @@ BUILD_MODE_DIR := $(BUILD_DIR)/$(BUILD_MODE)
 # ==============================================================================
 
 CC := clang
-BASE_CFLAGS := -std=c23 -Wall -Wextra -Wno-unused-variable -Wno-unused-function -MMD -MP
+BASE_CFLAGS := -std=c23 -Wall -Wextra -Wno-unused-variable -Wno-gnu-folding-constant -Wno-unused-function -MMD -MP
 INCLUDE_FLAGS := -I$(INCLUDE_DIR) -I$(EXTERNAL_DIR) -I$(EXTERNAL_INCLUDE_DIR)
 CFLAGS := $(BASE_CFLAGS) $(OPTIMIZATION_FLAGS) $(INCLUDE_FLAGS)
 

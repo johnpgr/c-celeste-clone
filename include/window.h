@@ -6,7 +6,7 @@
  * 
  * Creates the application delegate and sets up the Cocoa application.
  */
-void window_init();
+void window_init(const char* title, int width, int height);
 
 /**
  * @brief Clean up window resources

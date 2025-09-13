@@ -100,10 +100,6 @@ static InputState* input_state;
 static InputState* create_input_state(Arena* arena) {
     InputState* state = (InputState*)arena_alloc(arena, sizeof(InputState));
     memset(state, 0, sizeof(InputState));
-    state->screen_size = ivec2(WORLD_WIDTH * SCALE, WORLD_HEIGHT * SCALE);
-    state->mouse_pos = ivec2(0, 0);
-    state->mouse_pos_prev = ivec2(0, 0);
-    state->mouse_delta = ivec2(0, 0);
     return state;
 }
 

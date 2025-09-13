@@ -21,25 +21,29 @@ typedef enum {
     MOVE_DOWN,
     JUMP,
 
-    MOUSE_LEFT,
-    MOUSE_RIGHT,
+    MOUSE1,
+    MOUSE2,
 
     QUIT,
 
     GAME_INPUT_COUNT
 } GameInputType;
 
-typedef ARRAY(KeyCode, 3) KeyCodes;
+typedef struct {
+    ARRAY(KeyCode, 3) keys;
+} KeyMapping;
 
 typedef struct {
-    KeyCodes keys;
-} KeyMapping;
+    int neighbour_mask;
+    bool is_visible;
+} Tile;
 
 typedef struct {
     bool should_quit;
     bool fps_cap;
     IVec2 player_position;
 
+    Tile world_grid[WORLD_GRID.x][WORLD_GRID.y];
     KeyMapping key_mappings[GAME_INPUT_COUNT];
 } GameState;
 
@@ -54,8 +58,8 @@ static void init_key_mappings(GameState* state) {
     array_push(state->key_mappings[MOVE_DOWN].keys, KEY_DOWN);
     array_push(state->key_mappings[MOVE_RIGHT].keys, KEY_D);
     array_push(state->key_mappings[MOVE_RIGHT].keys, KEY_RIGHT);
-    array_push(state->key_mappings[MOUSE_LEFT].keys, KEY_MOUSE_LEFT);
-    array_push(state->key_mappings[MOUSE_RIGHT].keys, KEY_MOUSE_RIGHT);
+    array_push(state->key_mappings[MOUSE1].keys, KEY_MOUSE_LEFT);
+    array_push(state->key_mappings[MOUSE2].keys, KEY_MOUSE_RIGHT);
     array_push(state->key_mappings[QUIT].keys, KEY_ESCAPE);
 }
 

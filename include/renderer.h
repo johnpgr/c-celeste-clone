@@ -1,9 +1,10 @@
 #pragma once
 #include "def.h"
 #include "assets.h"
-#include "input.h"
 #include "consts.h"
 #include "arena.h"
+#include "array.h"
+#include "input.h"
 
 typedef struct {
     real32 zoom;
@@ -12,18 +13,17 @@ typedef struct {
 } OrthographicCamera2D;
 
 typedef struct {
-    IVec2 atlas_offset;
-    IVec2 sprite_size;
     Vec2 pos;
     Vec2 size;
+    IVec2 atlas_offset;
+    IVec2 sprite_size;
 } Transform;
 
 typedef struct {
     OrthographicCamera2D game_camera;
     OrthographicCamera2D ui_camera;
 
-    usize transform_count;
-    Transform transforms[MAX_TRANSFORMS];
+    ARRAY(Transform, 1000) transforms;
 } RendererState;
 
 static RendererState* renderer_state;
@@ -32,9 +32,10 @@ static RendererState* create_renderer_state(Arena* arena) {
     RendererState* state = (RendererState*)arena_alloc(arena, sizeof(RendererState));
     if (state) {
         memset(state, 0, sizeof(RendererState));
+        state->transforms.capacity = 1000;
         state->game_camera.zoom = 1.0f;
-        state->game_camera.dimensions = (Vec2){ WORLD_WIDTH * SCALE, WORLD_HEIGHT * SCALE };
-        state->game_camera.position = (Vec2){ 0.0f, 0.0f };
+        state->game_camera.dimensions = vec2(WORLD_WIDTH, WORLD_HEIGHT);
+        state->game_camera.position = vec2(160, -90);
 
         state->ui_camera.zoom = 1.0f;
         state->ui_camera = state->game_camera;
@@ -42,22 +43,47 @@ static RendererState* create_renderer_state(Arena* arena) {
     return state;
 }
 
-static void draw_sprite(SpriteID sprite_id, Vec2 pos) {
-    assert(renderer_state->transform_count + 1 <= MAX_TRANSFORMS
-           && "Max transform count reached");
+static IVec2 screen_to_world(IVec2 screen_pos) {
+    OrthographicCamera2D camera = renderer_state->game_camera;
 
+    int x = (real32)screen_pos.x / 
+            (real32)input_state->screen_size.x * 
+            camera.dimensions.x; // [0; dimensions.x]
+
+    // Offset using dimensions and position
+    x += -camera.dimensions.x / 2.0f + camera.position.x;
+
+    int y = (real32)screen_pos.y / 
+            (real32)input_state->screen_size.y * 
+            camera.dimensions.y; // [0; dimensions.y]
+
+    // Offset using dimensions and position
+    y += camera.dimensions.y / 2.0f + camera.position.y;
+
+    return (IVec2){x, y};
+}
+
+static void draw_sprite(SpriteID sprite_id, Vec2 pos) {
     Sprite sprite = get_sprite(sprite_id);
 
-    Vec2 sprite_size = vec2_mult(vec2iv2(sprite.size), SCALE);
+    Transform transform = {};
+    transform.pos = vec2_minus(pos, vec2_div(vec2iv2(sprite.size), 2.0f));
+    transform.size = vec2iv2(sprite.size);
+    transform.atlas_offset = sprite.atlas_offset;
+    transform.sprite_size = sprite.size;
 
+    array_push(renderer_state->transforms, transform);
+}
+
+static void draw_quad(Vec2 pos, Vec2 size) {
     Transform transform = {
-        .atlas_offset = sprite.atlas_offset,
-        .sprite_size = sprite.size,
-        .pos = vec2_div(vec2_minus(pos, sprite_size), 2.0f),
-        .size = sprite_size,
+        .pos = vec2_minus(pos, vec2_div(size, 2.0f)),
+        .size = size,
+        .atlas_offset = ivec2(0, 0),
+        .sprite_size = ivec2(1, 1),
     };
 
-    renderer_state->transforms[renderer_state->transform_count++] = transform;
+    array_push(renderer_state->transforms, transform);
 }
 
 // Functions provided by the platform renderer

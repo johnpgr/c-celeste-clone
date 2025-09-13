@@ -94,7 +94,7 @@ int main(int argc, [[maybe_unused]] char* argv[argc + 1]) {
     input_state = create_input_state(&permanent_storage);
     audio_state = create_audio_state(&permanent_storage);
 
-    window_init();
+    window_init("The game", 1280, 720);
     window_set_resizable(true);
     platform_audio_init();
     renderer_init();
